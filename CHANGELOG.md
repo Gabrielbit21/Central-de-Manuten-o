@@ -1,10 +1,10 @@
-# Changelog — v0.8.6 HOMOLOGAÇÃO
+# Changelog — v0.8.7 HOMOLOGAÇÃO
 
-- Refino mobile-first baseado em testes em aparelho real.
-- Nova Manutenção: dock fixo com quantidade, resumo da seleção e botão Prosseguir.
-- Banco de Dados: árvore visual convertida para hierarquia/accordion sem linhas no mobile.
-- Visão Geral: KPIs compactos e alinhados; busca/filtro empilhados corretamente.
-- PAM: KPIs leves e roláveis, busca/ano enquadrados, seletor de visão compacto, listagem e calendário refinados.
-- Menu Mais: remoção de excesso de blocos e espaçamento vertical reduzido.
-- Cabeçalho e navegação inferior ajustados para uso em celular.
-- Mantida integralmente a integração Supabase/PAM da v0.8.5.
+- Padronização tipográfica mobile-first em títulos, textos, botões, formulários, cards e listas.
+- Redução do botão Atualização em massa no Banco de Dados.
+- Reorganização dos KPIs do Banco de Dados no celular.
+- Remoção do botão X do menu Mais.
+- Backdrop do menu Mais suavizado.
+- Navegação inferior mantida visível durante o menu Mais, com estado ativo em laranja.
+- Refinamento dos textos na confirmação de seleção, PAM, Visão Geral e listas de equipamentos.
+- Nenhuma alteração de schema ou SQL.
