@@ -1,20 +1,18 @@
-# Central de Manutenção SE — Homologação v0.8.7
+# Central de Manutenção SE — Homologação v0.8.8
 
-Ambiente de homologação para testes internos e coleta de feedback antes da versão oficial.
+Ambiente de homologação da Central de Manutenção de Ativos de Subestação.
 
-## Destaques da v0.8.7
+## Destaques desta versão
 
-- Padronização global da tipografia no celular, reduzindo variações excessivas entre títulos, textos, botões e dados secundários.
-- Botão **Atualização em massa** compacto no Banco de Dados, preservando o destaque laranja sem competir com o título.
-- KPIs do Banco de Dados reequilibrados para o mobile.
-- Menu **Mais** sem botão de fechar redundante; toque fora fecha o painel.
-- Backdrop do menu Mais mais suave e navegação inferior permanece visível, com **Mais** destacado enquanto o painel está aberto.
-- Refinamento de escala em confirmação de manutenção, listas de ativos, PAM, Visão Geral e botões.
+- Melhor ritmo de espaçamento vertical no mobile.
+- KPIs do PAM com respiro lateral durante a rolagem horizontal.
+- Separação mais clara entre KPIs, busca, modos de visualização, filtros e resultados do PAM.
+- Indicador “Internet disponível / Modo local” ocultado na seleção de equipamentos no celular.
+- Ajustes adicionais de espaçamento em Visão Geral, Banco de Dados e Nova Manutenção.
+- Mantidas as funções e integrações da v0.8.7.
 
-## Publicação
+## Homologação
 
-Substitua os arquivos da raiz da branch `main` no repositório de homologação. O GitHub Pages mantém o mesmo endereço público.
+Publicar os arquivos desta pasta diretamente na raiz da branch `main` usada pelo GitHub Pages.
 
-## Segurança
-
-Não armazene chaves `service_role`, senhas ou segredos neste repositório.
+> Não armazenar chaves `service_role`, senhas ou outros segredos no repositório.
