@@ -1,15 +1,15 @@
-# Central de Manutenção SE — Homologação v0.8.5
+# Central de Manutenção SE — Homologação v0.8.6
 
-Ambiente de homologação da Central de Manutenção de Ativos de Subestação.
+Ambiente de homologação para testes internos e coleta de feedback antes da versão de produção.
 
-## Objetivo
+## Destaques desta build
 
-Esta publicação é destinada a testes internos e coleta de feedback antes da versão de produção. Os dados compartilhados utilizam o mesmo backend Supabase configurado no aplicativo.
+- refinamento mobile-first das telas administrativas e de campo;
+- rodapé fixo na seleção de ativos da Nova Manutenção;
+- Banco de Dados em hierarquia tipo acordeão no celular, sem conectores gráficos;
+- PAM com KPIs compactos, controles responsivos e cards de atividade mais leves;
+- Visão Geral com KPIs e filtros reorganizados para telas pequenas;
+- menu móvel Mais mais compacto;
+- identificação de ambiente HOMOLOGAÇÃO.
 
-## Publicação
-
-O site é estático e pode ser publicado diretamente pelo GitHub Pages a partir da raiz da branch `main`.
-
-## Atenção
-
-Não utilizar este repositório para armazenar chaves `service_role`, senhas ou outros segredos. O front-end contém somente a chave pública/publishable necessária ao cliente.
+O backend continua sendo o mesmo Supabase configurado na versão anterior. Não há migração SQL nesta build.

@@ -1,10 +1,10 @@
-# Changelog — v0.8.5 HOMOLOGAÇÃO
+# Changelog — v0.8.6 HOMOLOGAÇÃO
 
-- Identificação explícita do ambiente de homologação.
-- Redesenho do cabeçalho da tabela PAM para separar texto, ordenação e filtro.
-- Remoção do contorno preto de foco após clique nos cabeçalhos.
-- Estado ativo do cabeçalho com destaque leve em laranja.
-- Menu de filtro PAM simplificado: menos caixas, bordas e blocos.
-- Ordenação transformada em ações simples.
-- Lista de valores e rodapé do filtro compactados.
-- Preservação integral da lógica da v0.8.4 e da integração PAM/Supabase.
+- Refino mobile-first baseado em testes em aparelho real.
+- Nova Manutenção: dock fixo com quantidade, resumo da seleção e botão Prosseguir.
+- Banco de Dados: árvore visual convertida para hierarquia/accordion sem linhas no mobile.
+- Visão Geral: KPIs compactos e alinhados; busca/filtro empilhados corretamente.
+- PAM: KPIs leves e roláveis, busca/ano enquadrados, seletor de visão compacto, listagem e calendário refinados.
+- Menu Mais: remoção de excesso de blocos e espaçamento vertical reduzido.
+- Cabeçalho e navegação inferior ajustados para uso em celular.
+- Mantida integralmente a integração Supabase/PAM da v0.8.5.
