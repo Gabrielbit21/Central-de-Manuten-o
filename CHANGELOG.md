@@ -1,9 +1,13 @@
-# Changelog — v0.8.8 HOMOLOGAÇÃO
+# Changelog
 
-- Aumentado o respiro vertical entre títulos, subtítulos, buscas, filtros, listas e painéis no mobile.
-- Melhorado o espaçamento lateral da faixa rolável de KPIs do PAM.
-- KPIs longos do PAM receberam largura e quebra de linha mais confortáveis.
-- Busca, alternador de visualização, chips de filtro e resultados do PAM ganharam separação vertical mais consistente.
-- Removido do mobile o indicador redundante “Internet disponível / Modo local” na seleção de ativos da Nova Manutenção.
-- Refinados espaçamentos de Visão Geral, Banco de Dados e dock fixo da seleção de equipamentos.
-- Nenhuma alteração de banco de dados ou SQL.
+## v0.9.0 — Gestão de Usuários
+
+- Novo módulo administrativo **Usuários**.
+- Criação de usuário corporativo com perfil Administrativo ou Equipe de Campo.
+- Senha temporária com troca obrigatória no primeiro acesso.
+- Ativação e desativação de usuários.
+- Redefinição administrativa de senha.
+- Proteção contra autodesativação e contra remoção do último administrador ativo.
+- Auditoria das ações administrativas de usuários.
+- Cadastro público ocultado; novos acessos passam a ser provisionados pela administração.
+- Operações privilegiadas movidas para Edge Function, sem segredo no navegador.
