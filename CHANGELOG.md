@@ -1,24 +1,27 @@
-# Changelog
+# Changelog — Central de Manutenção SE
 
-## v0.9.2 — Refinamento da tela de login
+## v0.9.4 — HOMOLOGAÇÃO
 
-- Logo da Energisa da autenticação convertida para recurso embutido em Base64 dentro do HTML.
-- Eliminada a dependência do arquivo externo `logo-energisa-color.png` na tela de login.
+### Refinamento visual
+- Removidos o título do sistema e o subtítulo da tela inicial de autenticação.
+- Reduzida a logo Energisa na autenticação, com dimensões específicas para desktop e celular.
+- Aumentado o respiro entre a marca e o card de login para uma composição mais limpa e corporativa.
+
+### Mantido
+- Controle de build e atualização por `version.json` da v0.9.3.
+- Logo embutida no próprio HTML.
+- Logout automático na virada do dia, sem texto explicativo permanente na tela de login.
+
+## v0.9.3 — HOMOLOGAÇÃO
+- Tratamento de cache/stale em navegadores móveis com verificação de versão.
+- Remoção do registro incompleto de `service-worker.js`.
+- Logo de autenticação embutida no HTML.
+
+## v0.9.2 — HOMOLOGAÇÃO
+- Logo da tela de login embutida no HTML.
 - Removida a mensagem visual sobre encerramento diário da sessão.
-- Logout automático diário permanece ativo sem alteração de comportamento.
-- APP_VERSION atualizado para 0.9.2.
 
-## v0.9.1 — Autocadastro e sessão diária
-
-- Autocadastro pela tela **Solicitar acesso**.
-- Usuário escolhe o perfil solicitado: Equipe de Campo ou Administrativo.
-- Toda conta criada por autocadastro nasce como **Pendente** e sem acesso aos dados do aplicativo.
-- Painel administrativo com filas Pendentes, Ativos, Desativados e Rejeitados.
-- Administrador aprova exatamente o perfil escolhido no autocadastro; alterações posteriores continuam disponíveis na edição administrativa.
-- Administrador pode rejeitar solicitações.
-- RLS reforçada para impedir usuários pendentes/inativos de consultar ou gravar dados do aplicativo.
-- Bloqueio de alteração direta do próprio `role`/`active` em `profiles`.
-- Logout automático na virada de cada dia, no fuso America/Sao_Paulo.
-- Verificação ao abrir, voltar do segundo plano e durante o uso.
-- Rascunho de manutenção preservado antes do logout diário.
-- APP_VERSION atualizado para 0.9.1.
+## v0.9.1 — HOMOLOGAÇÃO
+- Autocadastro com aprovação administrativa.
+- Perfil solicitado pelo usuário.
+- Logout diário automático.

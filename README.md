@@ -1,16 +1,15 @@
-# Central de Manutenção SE — Homologação v0.9.2
+# Central de Manutenção SE — HOMOLOGAÇÃO v0.9.4
 
-Ambiente de homologação da Central de Manutenção de Ativos de Subestação.
+Build de homologação da Central de Manutenção SE.
 
-## Ajustes da v0.9.2
+## v0.9.4
 
-- Corrigida definitivamente a logo da Energisa na tela de login.
-- A logo da autenticação agora é embutida no próprio `index.html`, sem depender de arquivo externo no GitHub Pages.
-- Removida da tela de login a mensagem informando que a sessão é encerrada na virada do dia.
-- A lógica de logout diário continua ativa normalmente.
+- Simplifica visualmente a tela de autenticação.
+- Remove da tela de login o título `Central de Manutenção SE` e o subtítulo explicativo.
+- Reduz e reposiciona a logo Energisa para uma apresentação mais corporativa e equilibrada em desktop e celular.
+- Mantém as correções de atualização/cache introduzidas na v0.9.3.
+- Mantém o logout diário funcionando, sem mensagem permanente na tela de login.
 
-## Backend
+## Publicação no GitHub Pages
 
-Não há alteração de SQL ou Edge Function nesta versão. Continue usando o backend da v0.9.1 (`Supabase_Autocadastro_Aprovacao_v0.9.1.sql` e Edge Function `admin-users` v0.9.1).
-
-Não publique chaves secret/service_role no GitHub.
+Envie todos os arquivos deste diretório para a raiz da branch `main`, incluindo `version.json` e `.nojekyll`.
