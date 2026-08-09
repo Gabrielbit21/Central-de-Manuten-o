@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.2 — Refinamento da tela de login
+
+- Logo da Energisa da autenticação convertida para recurso embutido em Base64 dentro do HTML.
+- Eliminada a dependência do arquivo externo `logo-energisa-color.png` na tela de login.
+- Removida a mensagem visual sobre encerramento diário da sessão.
+- Logout automático diário permanece ativo sem alteração de comportamento.
+- APP_VERSION atualizado para 0.9.2.
+
 ## v0.9.1 — Autocadastro e sessão diária
 
 - Autocadastro pela tela **Solicitar acesso**.
