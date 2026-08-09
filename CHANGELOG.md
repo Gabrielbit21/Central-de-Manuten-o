@@ -1,13 +1,16 @@
 # Changelog
 
-## v0.9.0 — Gestão de Usuários
+## v0.9.1 — Autocadastro e sessão diária
 
-- Novo módulo administrativo **Usuários**.
-- Criação de usuário corporativo com perfil Administrativo ou Equipe de Campo.
-- Senha temporária com troca obrigatória no primeiro acesso.
-- Ativação e desativação de usuários.
-- Redefinição administrativa de senha.
-- Proteção contra autodesativação e contra remoção do último administrador ativo.
-- Auditoria das ações administrativas de usuários.
-- Cadastro público ocultado; novos acessos passam a ser provisionados pela administração.
-- Operações privilegiadas movidas para Edge Function, sem segredo no navegador.
+- Autocadastro pela tela **Solicitar acesso**.
+- Usuário escolhe o perfil solicitado: Equipe de Campo ou Administrativo.
+- Toda conta criada por autocadastro nasce como **Pendente** e sem acesso aos dados do aplicativo.
+- Painel administrativo com filas Pendentes, Ativos, Desativados e Rejeitados.
+- Administrador aprova exatamente o perfil escolhido no autocadastro; alterações posteriores continuam disponíveis na edição administrativa.
+- Administrador pode rejeitar solicitações.
+- RLS reforçada para impedir usuários pendentes/inativos de consultar ou gravar dados do aplicativo.
+- Bloqueio de alteração direta do próprio `role`/`active` em `profiles`.
+- Logout automático na virada de cada dia, no fuso America/Sao_Paulo.
+- Verificação ao abrir, voltar do segundo plano e durante o uso.
+- Rascunho de manutenção preservado antes do logout diário.
+- APP_VERSION atualizado para 0.9.1.
