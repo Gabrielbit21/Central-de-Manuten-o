@@ -1,4 +1,47 @@
-# Changelog — Central de Manutenção SE
+# Changelog
+
+## v1.1.1 — 2026-08-10
+- Corrige o front-end Web Push da v1.1.0.
+- Registra e mantém `sw.js` em vez de remover o Service Worker.
+- Adiciona ativação/desativação de Push por dispositivo no perfil.
+- Adiciona sino com contador e Central de Notificações.
+- Usa `push_notifications_enabled` e `update_own_push_notification_preferences`.
+- Atualiza a gestão administrativa para mostrar dispositivos Push ativos.
+- Adiciona migration idempotente do trigger `push_notification_dispatch`.
+- Mantém telefone/WhatsApp apenas como dado cadastral de contato.
+
+— Central de Manutenção SE
+
+## v1.0.0 — HOMOLOGAÇÃO
+
+### WhatsApp e perfis
+- WhatsApp passa a ser um dado cadastral para qualquer acesso: Administrativo ou Equipe de Campo.
+- Novas solicitações de acesso exigem telefone/WhatsApp.
+- Usuário pode editar o próprio WhatsApp e suas preferências de notificação.
+- Gestão administrativa permite cadastrar, aprovar e editar telefone e preferências.
+- Números são normalizados em E.164 no navegador/backend e novamente protegidos por normalização no banco.
+
+### Notificações transacionais
+- Novo relatório recebido → administradores habilitados.
+- Confirmação de recebimento → autor do relatório.
+- Relatório aprovado → autor do relatório.
+- Relatório devolvido para correção → autor do relatório, incluindo o motivo.
+- Relatório corrigido → administradores habilitados.
+- Preferências individuais por evento e chave master para desativar WhatsApp.
+
+### Backend e confiabilidade
+- Nova fila `notification_outbox` com idempotência, tentativas, erros e status de entrega.
+- Trigger de `maintenance_reports` cria os eventos automaticamente.
+- Edge Function `whatsapp-dispatch` envia templates pela WhatsApp Cloud API.
+- Edge Function `whatsapp-webhook` valida assinatura da Meta e atualiza `sent`, `delivered`, `read` ou `failed`.
+- Edge Function `admin-users` ampliada para telefone, preferências, histórico e reenvio administrativo.
+- Reenvio manual para falhas, limitado a 5 tentativas por notificação.
+- Tokens e secrets ficam fora do front-end e do GitHub.
+
+### Operação
+- Painel “Usuários e WhatsApp” mostra cobertura de números e últimas notificações.
+- Falhas exibem erro do provedor e ação de reenvio.
+- Documentação completa de implantação adicionada em `WHATSAPP_SETUP.md`.
 
 ## v0.9.5 — HOMOLOGAÇÃO
 

@@ -1,0 +1,16 @@
+{
+  "name": "Central de Manutenção SE",
+  "short_name": "Central SE",
+  "description": "Central de manutenção de ativos de subestação",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#008bb0",
+  "lang": "pt-BR",
+  "icons": [
+    {"src":"./assets/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./assets/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
