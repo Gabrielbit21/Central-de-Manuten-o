@@ -1,5 +1,16 @@
 # Changelog — Central de Manutenção SE
 
+## v0.9.5 — HOMOLOGAÇÃO
+
+### Refinamento visual
+- Removida da tela inicial a tag `Acesso administrativo` / `Acesso de campo`.
+- Botões de retorno das telas do fluxo passam a exibir somente a seta para a esquerda.
+- Retorno com aparência mais clean e corporativa: fundo transparente em repouso, realce sutil no hover/foco e área de toque preservada.
+- Adicionados rótulos de acessibilidade (`aria-label`) e dicas (`title`) aos retornos iconográficos.
+
+### Mantido
+- Todos os ajustes de autenticação, cache e atualização da v0.9.4.
+
 ## v0.9.4 — HOMOLOGAÇÃO
 
 ### Refinamento visual

@@ -1,14 +1,13 @@
-# Central de Manutenção SE — HOMOLOGAÇÃO v0.9.4
+# Central de Manutenção SE — HOMOLOGAÇÃO v0.9.5
 
 Build de homologação da Central de Manutenção SE.
 
-## v0.9.4
+## v0.9.5
 
-- Simplifica visualmente a tela de autenticação.
-- Remove da tela de login o título `Central de Manutenção SE` e o subtítulo explicativo.
-- Reduz e reposiciona a logo Energisa para uma apresentação mais corporativa e equilibrada em desktop e celular.
-- Mantém as correções de atualização/cache introduzidas na v0.9.3.
-- Mantém o logout diário funcionando, sem mensagem permanente na tela de login.
+- Remove da tela inicial a tag que indicava o tipo de acesso do usuário.
+- Padroniza os retornos de navegação como botão de ícone, exibindo somente a seta para a esquerda.
+- Mantém área de toque confortável, `title` e `aria-label` para desktop, celular e acessibilidade.
+- Preserva integralmente os refinamentos da tela de login introduzidos na v0.9.4.
 
 ## Publicação no GitHub Pages
 
