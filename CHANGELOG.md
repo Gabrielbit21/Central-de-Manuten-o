@@ -1,81 +1,50 @@
+# v1.3.0 — 2026-08-11
+
+- Cadastro aceita qualquer e-mail válido.
+- Mantém OTP de 6 dígitos via Supabase Auth/SMTP customizado.
+- Adiciona códigos de convite administrativos de uso único e expiração configurável.
+- Adiciona Edge Function `invite-signup`.
+- Remove restrições remanescentes ao domínio `@energisa.com.br` no autoatendimento e criação administrativa.
+
 # Changelog
 
-## v1.1.1 — 2026-08-10
-- Corrige o front-end Web Push da v1.1.0.
-- Registra e mantém `sw.js` em vez de remover o Service Worker.
-- Adiciona ativação/desativação de Push por dispositivo no perfil.
-- Adiciona sino com contador e Central de Notificações.
-- Usa `push_notifications_enabled` e `update_own_push_notification_preferences`.
-- Atualiza a gestão administrativa para mostrar dispositivos Push ativos.
-- Adiciona migration idempotente do trigger `push_notification_dispatch`.
-- Mantém telefone/WhatsApp apenas como dado cadastral de contato.
+## v1.2.0 — 2026-08-11
 
-— Central de Manutenção SE
+### Conta e autenticação
+- “Solicitar acesso” renomeado para **Criar conta**.
+- Cadastro por e-mail corporativo com código OTP de 6 dígitos.
+- Conta liberada imediatamente após confirmação do e-mail.
+- Autoatendimento cria somente perfil **Equipe de Campo**; privilégios administrativos continuam controlados por administradores.
+- Reenvio de código com intervalo mínimo de 60 segundos.
+- Removidos textos de aprovação administrativa do fluxo de autoatendimento.
+- Removido texto explicativo abaixo do campo WhatsApp.
 
-## v1.0.0 — HOMOLOGAÇÃO
+### Perfil e Push
+- Avatar passa a ser o próprio controle para alteração da foto.
+- Eliminada repetição de e-mail no cabeçalho do perfil.
+- Um único botão alterna entre **Ativar neste dispositivo** e **Desativar neste dispositivo**.
+- Removido indicador redundante “Ativo neste dispositivo”.
+- Push ativo é ressincronizado silenciosamente, sem aviso repetitivo a cada abertura.
+- Nenhuma solicitação de permissão é disparada automaticamente; a permissão só é pedida por ação do usuário.
 
-### WhatsApp e perfis
-- WhatsApp passa a ser um dado cadastral para qualquer acesso: Administrativo ou Equipe de Campo.
-- Novas solicitações de acesso exigem telefone/WhatsApp.
-- Usuário pode editar o próprio WhatsApp e suas preferências de notificação.
-- Gestão administrativa permite cadastrar, aprovar e editar telefone e preferências.
-- Números são normalizados em E.164 no navegador/backend e novamente protegidos por normalização no banco.
+### Central de Notificações
+- Removido botão X redundante do modal.
+- Toque/clique fora e tecla Esc fecham o modal.
+- “Marcar todas como lidas” só aparece quando há notificações não lidas.
+- Estado vazio mais compacto e refinado.
 
-### Notificações transacionais
-- Novo relatório recebido → administradores habilitados.
-- Confirmação de recebimento → autor do relatório.
-- Relatório aprovado → autor do relatório.
-- Relatório devolvido para correção → autor do relatório, incluindo o motivo.
-- Relatório corrigido → administradores habilitados.
-- Preferências individuais por evento e chave master para desativar WhatsApp.
+### Interface
+- Cabeçalho desktop reorganizado para evitar sobreposição entre navegação, notificações, avatar e status.
+- Versão exibida no cabeçalho sincronizada com v1.2.0.
+- Refinamentos responsivos do modal de perfil e notificações.
 
-### Backend e confiabilidade
-- Nova fila `notification_outbox` com idempotência, tentativas, erros e status de entrega.
-- Trigger de `maintenance_reports` cria os eventos automaticamente.
-- Edge Function `whatsapp-dispatch` envia templates pela WhatsApp Cloud API.
-- Edge Function `whatsapp-webhook` valida assinatura da Meta e atualiza `sent`, `delivered`, `read` ou `failed`.
-- Edge Function `admin-users` ampliada para telefone, preferências, histórico e reenvio administrativo.
-- Reenvio manual para falhas, limitado a 5 tentativas por notificação.
-- Tokens e secrets ficam fora do front-end e do GitHub.
+### Backend
+- Trigger antigo do WhatsApp removido de forma definitiva.
+- Trigger Web Push consolidado como único gerador de eventos.
+- Grants de `service_role` corrigidos para `push_subscriptions`, `notification_outbox`, `substations` e `profiles`.
+- Notificações antigas presas em `sending` são marcadas como falha recuperável.
+- RPC seguro `finalize_verified_self_signup()` adicionado.
 
-### Operação
-- Painel “Usuários e WhatsApp” mostra cobertura de números e últimas notificações.
-- Falhas exibem erro do provedor e ação de reenvio.
-- Documentação completa de implantação adicionada em `WHATSAPP_SETUP.md`.
-
-## v0.9.5 — HOMOLOGAÇÃO
-
-### Refinamento visual
-- Removida da tela inicial a tag `Acesso administrativo` / `Acesso de campo`.
-- Botões de retorno das telas do fluxo passam a exibir somente a seta para a esquerda.
-- Retorno com aparência mais clean e corporativa: fundo transparente em repouso, realce sutil no hover/foco e área de toque preservada.
-- Adicionados rótulos de acessibilidade (`aria-label`) e dicas (`title`) aos retornos iconográficos.
-
-### Mantido
-- Todos os ajustes de autenticação, cache e atualização da v0.9.4.
-
-## v0.9.4 — HOMOLOGAÇÃO
-
-### Refinamento visual
-- Removidos o título do sistema e o subtítulo da tela inicial de autenticação.
-- Reduzida a logo Energisa na autenticação, com dimensões específicas para desktop e celular.
-- Aumentado o respiro entre a marca e o card de login para uma composição mais limpa e corporativa.
-
-### Mantido
-- Controle de build e atualização por `version.json` da v0.9.3.
-- Logo embutida no próprio HTML.
-- Logout automático na virada do dia, sem texto explicativo permanente na tela de login.
-
-## v0.9.3 — HOMOLOGAÇÃO
-- Tratamento de cache/stale em navegadores móveis com verificação de versão.
-- Remoção do registro incompleto de `service-worker.js`.
-- Logo de autenticação embutida no HTML.
-
-## v0.9.2 — HOMOLOGAÇÃO
-- Logo da tela de login embutida no HTML.
-- Removida a mensagem visual sobre encerramento diário da sessão.
-
-## v0.9.1 — HOMOLOGAÇÃO
-- Autocadastro com aprovação administrativa.
-- Perfil solicitado pelo usuário.
-- Logout diário automático.
+### Identidade visual
+- Novo PNG fornecido para o aplicativo aplicado aos ícones PWA.
+- Gerado `central-manutencao.ico` para futuro pacote Windows.

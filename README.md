@@ -1,61 +1,50 @@
-# Central de Manutenção SE — HOMOLOGAÇÃO v1.1.1
+# Central de Manutenção SE — v1.3.0 Homologação
 
-Versão de homologação com notificações **Web Push** e Central de Notificações interna.
+Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
 ## Principais recursos
 
-- Telefone/WhatsApp permanece como dado cadastral de todos os usuários.
-- Notificações externas usam Web Push, sem WhatsApp Cloud API e sem tarifa de mensageria da Meta.
-- Cada usuário ativa o Push individualmente em cada computador ou celular.
-- Administrativo recebe:
-  - novo relatório recebido;
-  - relatório corrigido e reenviado.
-- Equipe de Campo recebe:
-  - confirmação de recebimento;
-  - relatório aprovado;
-  - relatório devolvido para correção.
-- Sino no topo com contador de não lidas.
-- Central de Notificações com leitura individual.
-- Fila `notification_outbox` com idempotência e reenvio controlado.
-- Vários dispositivos Push podem ser cadastrados para o mesmo usuário.
-- Painel administrativo mostra quantos dispositivos Push ativos cada usuário possui.
+- manutenção e histórico de ativos por subestação;
+- fluxo administrativo e de equipe de campo;
+- funcionamento offline com sincronização posterior;
+- fotos, relatórios, correções, aprovação e devolução controlada;
+- Central de Notificações e Web Push por dispositivo;
+- preferências de notificações por usuário;
+- criação de conta com validação de e-mail por código OTP;
+- gestão administrativa de usuários e promoção de perfil;
+- PWA para instalação pelo navegador;
+- ícone oficial preparado para PWA e futuro empacotamento Windows/Android.
 
-## Arquitetura
+## Ordem de atualização a partir da v1.1.1
 
-`maintenance_reports` → trigger de eventos → `notification_outbox` → trigger `pg_net` → Edge Function `push-dispatch` → Push Service do navegador → dispositivo.
+1. Publique/atualize as Edge Functions:
+   - `admin-users`
+   - `push-config`
+   - `push-dispatch`
+2. Execute `supabase/migrations/20260811_release_candidate.sql`.
+3. Configure a confirmação de e-mail/SMTP conforme `EMAIL_VERIFICATION_SETUP.md`.
+4. Suba os arquivos desta versão para a raiz do GitHub Pages.
+5. Faça `Ctrl+F5` ou feche/reabra a PWA para carregar o novo Service Worker.
 
-A `notification_outbox` também alimenta a Central de Notificações dentro do aplicativo.
+## Secrets mantidos
 
-## Backend
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT`
+- `CENTRAL_WEBHOOK_SECRET`
 
-Edge Functions utilizadas:
+O Vault deve continuar contendo `central_webhook_secret` com o mesmo valor de `CENTRAL_WEBHOOK_SECRET`.
 
-- `admin-users`
-- `push-config`
-- `push-dispatch`
+## WhatsApp
 
-Migrations:
+O telefone/WhatsApp permanece apenas como dado cadastral. Nenhum envio pela Meta/WhatsApp é utilizado nesta versão.
 
-- `20260810_whatsapp_notifications.sql` — base histórica da fila e preferências.
-- `20260810_web_push_notifications.sql` — migração para Web Push.
-- `20260810_push_dispatch_trigger.sql` — trigger seguro de despacho via Vault + `pg_net`.
+As antigas Edge Functions `whatsapp-dispatch` e `whatsapp-webhook` podem ser removidas do projeto Supabase depois da validação da v1.3.0.
 
-## Front-end / GitHub Pages
+## Empacotamento
 
-Publique na mesma raiz:
+`assets/icons/app-icon-source.png` é a arte oficial. `assets/icons/central-manutencao.ico` já fica preparado como base do instalador Windows; os PNGs são usados no PWA/Android.
 
-- `index.html`
-- `version.json`
-- `.nojekyll`
-- `manifest.webmanifest`
-- `sw.js`
-- `assets/icons/icon-192.png`
-- `assets/icons/icon-512.png`
 
-A pasta `supabase/` deve permanecer versionada no repositório.
-
-## Configuração
-
-Consulte `PUSH_SETUP.md` para o passo a passo completo de implantação e homologação.
-
-> A v1.1.1 corrige a inconsistência do front-end da v1.1.0: agora o Service Worker é registrado e mantido, o Push pode ser ativado/desativado por dispositivo e a interface usa `push_notifications_enabled` corretamente.
+## v1.3.0
+Cadastro com qualquer e-mail válido, OTP via SMTP customizado e código de convite administrativo de uso único como contingência.
