@@ -1,3 +1,14 @@
+# v1.4.0 — 2026-08-11
+
+- Saudação inicial personalizada com o primeiro nome do usuário.
+- Resumo semanal inteligente para Equipe de Campo e Equipe Administrativa.
+- Equipe de Campo visualiza relatórios registrados na semana e devoluções pendentes.
+- Equipe Administrativa visualiza relatórios recebidos na semana e pendências de conferência.
+- Cabeçalho desktop com maior espaçamento e melhor aproveitamento da largura disponível.
+- Indicador de homologação removido do cabeçalho e movido para rodapé discreto.
+- Botão de notificações simplificado para sino sem moldura pesada.
+- Build, APP_VERSION e Service Worker sincronizados em 1.4.0.
+
 # v1.3.0 — 2026-08-11
 
 - Cadastro aceita qualquer e-mail válido.

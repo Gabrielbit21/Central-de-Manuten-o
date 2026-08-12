@@ -1,4 +1,4 @@
-# Central de Manutenção SE — v1.3.0 Homologação
+# Central de Manutenção SE — v1.4.0 Homologação
 
 Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
@@ -39,12 +39,18 @@ O Vault deve continuar contendo `central_webhook_secret` com o mesmo valor de `C
 
 O telefone/WhatsApp permanece apenas como dado cadastral. Nenhum envio pela Meta/WhatsApp é utilizado nesta versão.
 
-As antigas Edge Functions `whatsapp-dispatch` e `whatsapp-webhook` podem ser removidas do projeto Supabase depois da validação da v1.3.0.
+As antigas Edge Functions `whatsapp-dispatch` e `whatsapp-webhook` podem ser removidas do projeto Supabase depois da validação da v1.4.0.
 
 ## Empacotamento
 
 `assets/icons/app-icon-source.png` é a arte oficial. `assets/icons/central-manutencao.ico` já fica preparado como base do instalador Windows; os PNGs são usados no PWA/Android.
 
+
+## v1.4.0
+
+Refinamento da experiência inicial: saudação pelo primeiro nome, resumo operacional inteligente por perfil, cabeçalho corporativo mais espaçado, sino de notificações simplificado e indicador de homologação movido para o rodapé.
+
+Para atualizar a partir da v1.3.0, consulte `ATUALIZACAO_V1.4.0.md`. Não há nova migration nem novo deploy de Edge Function nesta release.
 
 ## v1.3.0
 Cadastro com qualquer e-mail válido, OTP via SMTP customizado e código de convite administrativo de uso único como contingência.
