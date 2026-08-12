@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.6.0 — 2026-08-12
+
+- cards da home com bordas coloridas por contexto;
+- Banco de Dados com KPIs abaixo dos filtros;
+- botões de exportação e atualização em massa destacados em laranja;
+- modais principais com fechamento via X e sem fechar por clique externo;
+- normalização de equipes na exportação para reduzir duplicidades;
+- refinamento visual do campo de código de validação.
+
+## v1.5.2 — Refinamento responsivo e OTP
+
+- Campo de confirmação de e-mail fica visualmente limpo, sem o placeholder “Código recebido”.
+- Mensagem após envio do OTP foi simplificada.
+- Shell da aplicação padronizado para uma única superfície de rolagem vertical.
+- Removida a margem negativa do rodapé de homologação, que podia gerar overflow vertical artificial.
+- Página inicial ganhou alturas fluidas baseadas na viewport para notebook, desktop e widescreen.
+- Ajustes específicos para telas desktop de pouca altura evitam rolagem sem necessidade.
+- No celular, o rodapé de homologação fica acima da navegação fixa sem aumentar a altura do documento.
+- Mantidos os comportamentos responsivos para celular, notebook e monitores largos.
+- Build e Service Worker atualizados para 1.5.2.
+
 ## v1.5.1 — Correção do código OTP
 
 - Corrigido o campo de confirmação de e-mail que limitava o OTP a 6 dígitos.

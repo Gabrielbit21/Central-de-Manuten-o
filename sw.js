@@ -1,4 +1,4 @@
-const SW_VERSION = '1.5.1';
+const SW_VERSION = '1.5.2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
