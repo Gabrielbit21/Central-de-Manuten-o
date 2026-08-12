@@ -3,7 +3,7 @@
 ## Fluxo principal: e-mail OTP
 - Aceita qualquer endereço de e-mail válido.
 - Supabase Auth envia `{{ .Token }}` pelo SMTP customizado.
-- O usuário digita os 6 dígitos e a conta é liberada como Equipe de Campo.
+- O usuário digita o código numérico recebido e a conta é liberada como Equipe de Campo. O front-end não fixa uma quantidade exata de dígitos; a validação final é feita pelo Supabase Auth.
 
 ## Contingência: código de convite
 - Um administrador abre **Usuários e notificações → Gerar convite**.

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.1 — Correção do código OTP
+
+- Corrigido o campo de confirmação de e-mail que limitava o OTP a 6 dígitos.
+- O cadastro agora aceita o código numérico efetivamente enviado pelo Supabase Auth, sem assumir comprimento fixo.
+- Textos da interface deixam de mencionar obrigatoriamente “6 dígitos”.
+- Incluída migration de consolidação do `handle_new_user()` para manter cadastro com qualquer e-mail válido e perfil inicial de Equipe de Campo.
+- Build e Service Worker atualizados para 1.5.1.
+
 ## v1.5.0 — Exportação padronizada e base evolutiva
 
 - Novo módulo de exportação Excel no Banco de Dados.

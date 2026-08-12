@@ -1,4 +1,4 @@
-# Central de Manutenção SE — v1.5.0 Homologação
+# Central de Manutenção SE — v1.5.1 Homologação
 
 Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
