@@ -1,4 +1,4 @@
-# Central de Manutenção SE — v1.4.0 Homologação
+# Central de Manutenção SE — v1.5.0 Homologação
 
 Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
@@ -54,3 +54,8 @@ Para atualizar a partir da v1.3.0, consulte `ATUALIZACAO_V1.4.0.md`. Não há no
 
 ## v1.3.0
 Cadastro com qualquer e-mail válido, OTP via SMTP customizado e código de convite administrativo de uso único como contingência.
+
+
+## Exportação e padronização de dados — v1.5.0
+
+O Banco de Dados possui exportação Excel padronizada para ativos e manutenções. O contrato `CMSE_EXPORT_V1` mantém nomes e ordem de campos estáveis e inclui dicionário de dados. A base passa a registrar uma família funcional por ativo (`SUBESTACAO`, `REPETIDORA`, `RELIGADOR_DISTRIBUICAO`), permitindo a evolução futura sem quebrar as exportações atuais.

@@ -1,3 +1,14 @@
+# Changelog
+
+## v1.5.0 — Exportação padronizada e base evolutiva
+
+- Novo módulo de exportação Excel no Banco de Dados.
+- Filtros de manutenção por semana, mês, período personalizado, equipe, local, família e status.
+- Histórico por ativo e workbook consolidado.
+- Dicionário de dados `CMSE_EXPORT_V1` incluído nos arquivos.
+- Nova tabela `asset_families` e campo `assets.family_code`.
+- Famílias futuras preparadas sem expor módulos ainda não homologados.
+
 # v1.4.0 — 2026-08-11
 
 - Saudação inicial personalizada com o primeiro nome do usuário.

@@ -1,7 +1,7 @@
 {
   "name": "Central de Manutenção SE",
   "short_name": "Central SE",
-  "description": "Central de manutenção de ativos de subestação",
+  "description": "Central de manutenção de ativos técnicos — Subestações, com base preparada para novas famílias",
   "id": "./",
   "start_url": "./",
   "scope": "./",
