@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.1 — 2026-08-13
+
+- cabeçalho corrigido para notebooks e larguras intermediárias;
+- marca, navegação, menu Mais e usuário mantidos na mesma linha;
+- cards da home com borda temática apenas no hover/foco;
+- comportamento touch preservado com bordas neutras.
+
 ## v1.6.0 — 2026-08-12
 
 - cards da home com bordas coloridas por contexto;
