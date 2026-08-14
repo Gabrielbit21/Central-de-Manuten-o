@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.8.0 — 2026-08-14
+
+- **Visão geral** renomeada para **Relatórios** no cabeçalho, Home, mobile e título da tela;
+- menu **Mais** passa a aparecer somente quando houver itens realmente recolhidos por falta de espaço;
+- maior respiro entre logo e navegação e entre os itens do cabeçalho;
+- botão **X** do perfil padronizado visualmente com os demais fechamentos;
+- tabela de Usuários alinhada em `Usuário | Último acesso | Perfil | Status | Ações`;
+- mensagem técnica `CMSE_EXPORT_V1` removida da interface do painel de exportação, permanecendo no contrato/arquivo Excel;
+- KPIs da tela Relatórios redesenhados no mesmo padrão executivo das demais áreas;
+- build, versão do aplicativo e Service Worker sincronizados em 1.8.0.
+
 ## v1.7.0 — 2026-08-14
 
 - cabeçalho desktop/notebook com navegação completa ao lado da logo e menu **Mais** adaptativo somente quando faltar espaço;
