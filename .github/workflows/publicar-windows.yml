@@ -1,0 +1,530 @@
+name: Publicar instalador Windows v1.9.0
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar código da v1.9.0 READY
+        uses: actions/checkout@v4
+
+      - name: Preparar Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+
+      - name: Instalar ferramentas
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          go install github.com/akavel/rsrc@936343600d578fb5da472acf6987ed76935a389b
+          choco install innosetup -y --no-progress
+
+      - name: Criar launcher da Central
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force tools/winbuild | Out-Null
+
+          @'
+          module central/launcher
+
+          go 1.23
+          '@ | Set-Content -Encoding utf8 tools/winbuild/go.mod
+
+          @'
+          package main
+
+          import (
+              "context"
+              "fmt"
+              "log"
+              "mime"
+              "net"
+              "net/http"
+              "os"
+              "os/exec"
+              "path"
+              "path/filepath"
+              "strings"
+              "syscall"
+              "time"
+              "unsafe"
+          )
+
+          const (
+              appName = "Central de Manutenção SE"
+              port    = "17891"
+          )
+
+          var (
+              user32         = syscall.NewLazyDLL("user32.dll")
+              procMessageBox = user32.NewProc("MessageBoxW")
+          )
+
+          func messageBox(title, text string, flags uintptr) int {
+              t, _ := syscall.UTF16PtrFromString(title)
+              m, _ := syscall.UTF16PtrFromString(text)
+              r, _, _ := procMessageBox.Call(
+                  0,
+                  uintptr(unsafe.Pointer(m)),
+                  uintptr(unsafe.Pointer(t)),
+                  flags,
+              )
+              return int(r)
+          }
+
+          func setupLog() *os.File {
+              root := filepath.Join(
+                  os.Getenv("LOCALAPPDATA"),
+                  "CentralManutencaoSE",
+                  "logs",
+              )
+              _ = os.MkdirAll(root, 0755)
+
+              f, err := os.OpenFile(
+                  filepath.Join(root, "launcher.log"),
+                  os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+                  0644,
+              )
+
+              if err == nil {
+                  log.SetOutput(f)
+                  log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+              }
+
+              return f
+          }
+
+          func edgePath() string {
+              candidates := []string{
+                  filepath.Join(
+                      os.Getenv("ProgramFiles(x86)"),
+                      "Microsoft", "Edge", "Application", "msedge.exe",
+                  ),
+                  filepath.Join(
+                      os.Getenv("ProgramFiles"),
+                      "Microsoft", "Edge", "Application", "msedge.exe",
+                  ),
+                  filepath.Join(
+                      os.Getenv("LOCALAPPDATA"),
+                      "Microsoft", "Edge", "Application", "msedge.exe",
+                  ),
+              }
+
+              for _, p := range candidates {
+                  if p == "" {
+                      continue
+                  }
+
+                  if st, err := os.Stat(p); err == nil && !st.IsDir() {
+                      return p
+                  }
+              }
+
+              if p, err := exec.LookPath("msedge.exe"); err == nil {
+                  return p
+              }
+
+              return ""
+          }
+
+          func safeFileHandler(appDir string) http.HandlerFunc {
+              appRoot := filepath.Clean(appDir) + string(os.PathSeparator)
+
+              return func(w http.ResponseWriter, r *http.Request) {
+                  w.Header().Set("X-Content-Type-Options", "nosniff")
+                  w.Header().Set("Referrer-Policy", "no-referrer")
+                  w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+
+                  cleanURL := path.Clean("/" + r.URL.Path)
+                  rel := strings.TrimPrefix(cleanURL, "/")
+
+                  if rel == "" || rel == "." {
+                      rel = "index.html"
+                  }
+
+                  full := filepath.Clean(
+                      filepath.Join(appDir, filepath.FromSlash(rel)),
+                  )
+
+                  if full != filepath.Clean(appDir) &&
+                      !strings.HasPrefix(full, appRoot) {
+                      http.Error(w, "forbidden", http.StatusForbidden)
+                      return
+                  }
+
+                  st, err := os.Stat(full)
+                  if err != nil || st.IsDir() {
+                      http.NotFound(w, r)
+                      return
+                  }
+
+                  ext := strings.ToLower(filepath.Ext(full))
+
+                  if ext == ".webmanifest" {
+                      w.Header().Set(
+                          "Content-Type",
+                          "application/manifest+json; charset=utf-8",
+                      )
+                  }
+
+                  if ext == ".js" {
+                      w.Header().Set(
+                          "Content-Type",
+                          "text/javascript; charset=utf-8",
+                      )
+                  }
+
+                  if ext == ".json" {
+                      w.Header().Set(
+                          "Content-Type",
+                          "application/json; charset=utf-8",
+                      )
+                  }
+
+                  if ext == ".html" ||
+                      filepath.Base(full) == "sw.js" ||
+                      filepath.Base(full) == "version.json" ||
+                      filepath.Base(full) == "app.js" {
+
+                      w.Header().Set(
+                          "Cache-Control",
+                          "no-cache, no-store, must-revalidate",
+                      )
+                  } else {
+                      w.Header().Set(
+                          "Cache-Control",
+                          "public, max-age=86400",
+                      )
+                  }
+
+                  if w.Header().Get("Content-Type") == "" {
+                      if c := mime.TypeByExtension(ext); c != "" {
+                          w.Header().Set("Content-Type", c)
+                      }
+                  }
+
+                  http.ServeFile(w, r, full)
+              }
+          }
+
+          func launchEdge(url string) (*exec.Cmd, error) {
+              edge := edgePath()
+
+              if edge == "" {
+                  return nil, fmt.Errorf(
+                      "Microsoft Edge não foi encontrado",
+                  )
+              }
+
+              profile := filepath.Join(
+                  os.Getenv("LOCALAPPDATA"),
+                  "CentralManutencaoSE",
+                  "EdgeProfile",
+              )
+
+              _ = os.MkdirAll(profile, 0755)
+
+              args := []string{
+                  "--app=" + url,
+                  "--user-data-dir=" + profile,
+                  "--no-first-run",
+                  "--no-default-browser-check",
+              }
+
+              cmd := exec.Command(edge, args...)
+              cmd.SysProcAttr = &syscall.SysProcAttr{
+                  HideWindow: true,
+              }
+
+              if err := cmd.Start(); err != nil {
+                  return nil, err
+              }
+
+              return cmd, nil
+          }
+
+          func main() {
+              lf := setupLog()
+
+              if lf != nil {
+                  defer lf.Close()
+              }
+
+              exe, err := os.Executable()
+
+              if err != nil {
+                  messageBox(
+                      appName,
+                      "Não foi possível localizar a instalação.",
+                      0x10,
+                  )
+                  return
+              }
+
+              appDir := filepath.Join(
+                  filepath.Dir(exe),
+                  "web",
+              )
+
+              if _, err := os.Stat(
+                  filepath.Join(appDir, "index.html"),
+              ); err != nil {
+                  messageBox(
+                      appName,
+                      "Arquivos do aplicativo não foram encontrados. Reinstale a Central de Manutenção.",
+                      0x10,
+                  )
+                  return
+              }
+
+              addr := "127.0.0.1:" + port
+              url := "http://" + addr + "/"
+
+              ln, err := net.Listen("tcp", addr)
+
+              if err != nil {
+                  conn, dialErr := net.DialTimeout(
+                      "tcp",
+                      addr,
+                      800*time.Millisecond,
+                  )
+
+                  if dialErr == nil {
+                      _ = conn.Close()
+
+                      if _, launchErr := launchEdge(url); launchErr != nil {
+                          messageBox(
+                              appName,
+                              launchErr.Error(),
+                              0x10,
+                          )
+                      }
+
+                      return
+                  }
+
+                  messageBox(
+                      appName,
+                      "Não foi possível iniciar o serviço local da Central. A porta 17891 está indisponível.",
+                      0x10,
+                  )
+                  return
+              }
+
+              server := &http.Server{
+                  Handler:           safeFileHandler(appDir),
+                  ReadHeaderTimeout: 8 * time.Second,
+                  IdleTimeout:       60 * time.Second,
+              }
+
+              go func() {
+                  if err := server.Serve(ln); err != nil &&
+                      err != http.ErrServerClosed {
+                      log.Printf("http server: %v", err)
+                  }
+              }()
+
+              cmd, err := launchEdge(url)
+
+              if err != nil {
+                  _ = server.Shutdown(context.Background())
+
+                  messageBox(
+                      appName,
+                      "Não foi possível abrir a Central de Manutenção.\n\n"+
+                          err.Error(),
+                      0x10,
+                  )
+                  return
+              }
+
+              _ = cmd.Wait()
+
+              ctx, cancel := context.WithTimeout(
+                  context.Background(),
+                  3*time.Second,
+              )
+              defer cancel()
+
+              _ = server.Shutdown(ctx)
+          }
+          '@ | Set-Content -Encoding utf8 tools/winbuild/main.go
+
+          Push-Location tools/winbuild
+
+          rsrc `
+            -ico ../../assets/icons/central-manutencao.ico `
+            -arch amd64 `
+            -o rsrc_windows_amd64.syso
+
+          go build `
+            -trimpath `
+            -ldflags '-H=windowsgui -s -w' `
+            -o CentralManutencaoSE.exe .
+
+          Pop-Location
+
+      - name: Gerar instalador
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            dist/windows | Out-Null
+
+          @'
+          #define MyAppName "Central de Manutenção SE"
+          #define MyAppVersion "1.9.0"
+          #define MyAppExeName "CentralManutencaoSE.exe"
+
+          [Setup]
+          AppId={{A30BF697-8C8A-43EA-B6B6-3E77B498D30F}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher=Central de Manutenção SE
+          DefaultDirName={localappdata}\Programs\CentralManutencaoSE
+          DefaultGroupName={#MyAppName}
+          DisableProgramGroupPage=yes
+          PrivilegesRequired=lowest
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          SetupIconFile=..\..\assets\icons\central-manutencao.ico
+          UninstallDisplayIcon={app}\web\assets\icons\central-manutencao.ico
+          OutputDir=..\..\dist\windows
+          OutputBaseFilename=Central_Manutencao_SE_Setup_v1.9.0
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          WizardStyle=modern
+          CloseApplications=yes
+          RestartApplications=no
+
+          [Files]
+          Source: "CentralManutencaoSE.exe"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "..\..\index.html"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\app.js"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\sw.js"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\manifest.webmanifest"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\version.json"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\web"; Flags: ignoreversion
+          Source: "..\..\assets\*"; DestDir: "{app}\web\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "..\..\vendor\*"; DestDir: "{app}\web\vendor"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\web\assets\icons\central-manutencao.ico"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\web\assets\icons\central-manutencao.ico"
+
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "Abrir {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+          [UninstallDelete]
+          Type: filesandordirs; Name: "{localappdata}\CentralManutencaoSE"
+          '@ | Set-Content `
+            -Encoding utf8 `
+            tools/winbuild/installer.iss
+
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+
+          if (-not (Test-Path $iscc)) {
+              throw 'Inno Setup não encontrado.'
+          }
+
+          & $iscc tools/winbuild/installer.iss
+
+      - name: Gerar checksum e pacote ZIP
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $exe = 'dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe'
+
+          $hash = (
+              Get-FileHash $exe -Algorithm SHA256
+          ).Hash.ToLower()
+
+          "$hash  Central_Manutencao_SE_Setup_v1.9.0.exe" |
+              Set-Content `
+                -Encoding ascii `
+                'dist/windows/SHA256_WINDOWS_V1.9.0.txt'
+
+          @'
+          # Central de Manutenção SE — Windows v1.9.0
+
+          - Windows 10/11 x64
+          - Instalação por usuário
+          - Mesmo ícone do PWA
+          - Front-end e bibliotecas JavaScript incorporados
+          - Backend Supabase compartilhado
+          - Requer Microsoft Edge
+          - Sem assinatura Authenticode comercial
+          '@ | Set-Content `
+            -Encoding utf8 `
+            'dist/windows/INSTALADOR_WINDOWS_V1.9.0.md'
+
+          Compress-Archive `
+            -Path 'dist/windows/*' `
+            -DestinationPath 'dist/Central_Manutencao_SE_Windows_v1.9.0.zip' `
+            -Force
+
+          @'
+          # Central de Manutenção SE v1.9.0 — Windows
+
+          Instalador Windows x64 gerado diretamente da versão
+          v1.9.0 READY publicada neste repositório.
+
+          O pacote usa o mesmo ícone do PWA e mantém as
+          dependências JavaScript localmente.
+          '@ | Set-Content `
+            -Encoding utf8 `
+            'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
+
+      - name: Guardar artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Central-Manutencao-SE-Windows-v1.9.0
+          path: |
+            dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe
+            dist/windows/SHA256_WINDOWS_V1.9.0.txt
+            dist/windows/INSTALADOR_WINDOWS_V1.9.0.md
+            dist/Central_Manutencao_SE_Windows_v1.9.0.zip
+          if-no-files-found: error
+
+      - name: Publicar em Releases
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $tag = 'windows-v1.9.0'
+
+          $assets = @(
+            'dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe',
+            'dist/windows/SHA256_WINDOWS_V1.9.0.txt',
+            'dist/windows/INSTALADOR_WINDOWS_V1.9.0.md',
+            'dist/Central_Manutencao_SE_Windows_v1.9.0.zip'
+          )
+
+          gh release view $tag *> $null
+
+          if ($LASTEXITCODE -eq 0) {
+              gh release upload $tag @assets --clobber
+          }
+          else {
+              gh release create `
+                $tag `
+                @assets `
+                --target '${{ github.sha }}' `
+                --title 'Central de Manutenção SE v1.9.0 — Windows' `
+                --notes-file 'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
+          }
