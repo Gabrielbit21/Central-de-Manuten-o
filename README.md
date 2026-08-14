@@ -1,8 +1,8 @@
-# Central de Manutenção SE — v1.8.1 Homologação
+# Central de Manutenção SE — v1.9.0 Corporate Ready
 
 Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
-## v1.8.1 — Homologação Final de UI/UX
+## Base visual: v1.8.2 — Homologação Final de UI/UX
 
 Consolida os últimos ajustes de cabeçalho, nomenclatura **Relatórios**, tabela de usuários, KPIs e acabamento dos painéis de exportação/perfil. A atualização a partir da v1.7.0 é somente de frontend/GitHub Pages e não requer SQL ou novo deploy de Edge Functions.
 
@@ -63,3 +63,15 @@ Cadastro com qualquer e-mail válido, OTP via SMTP customizado e código de conv
 ## Exportação e padronização de dados — v1.5.0
 
 O Banco de Dados possui exportação Excel padronizada para ativos e manutenções. O contrato `CMSE_EXPORT_V1` mantém nomes e ordem de campos estáveis e inclui dicionário de dados. A base passa a registrar uma família funcional por ativo (`SUBESTACAO`, `REPETIDORA`, `RELIGADOR_DISTRIBUICAO`), permitindo a evolução futura sem quebrar as exportações atuais.
+
+
+## v1.9.0 Corporate Ready
+
+Antes de publicar a v1.9.0, leia `ATUALIZACAO_V1.9.0.md`. Esta versão exige:
+
+1. precheck somente leitura `PRECHECK_V1.9.0.sql`;
+2. migration `20260814_corporate_hardening.sql`;
+3. auditoria `SECURITY_AUDIT_V1.9.0.sql`;
+4. execução de `PREPARAR_RELEASE.bat` para incorporar as bibliotecas JavaScript fixadas localmente.
+
+O pacote READY resultante é a base recomendada para GitHub Pages, Windows e Android.

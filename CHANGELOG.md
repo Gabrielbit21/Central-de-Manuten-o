@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.9.0 — 2026-08-14 — Corporate Ready / Security Hardening
+
+- removida a base operacional embarcada no frontend estático;
+- removido o seed PAM do `index.html`;
+- cache de snapshot isolado por usuário e limpo no encerramento de sessão;
+- `profile_directory` criado para expor somente campos necessários dos demais perfis;
+- migration de RLS/privilégio mínimo e Storage privado;
+- PAM garantido no Supabase antes da retirada do fallback estático;
+- Supabase JS e SheetJS passam a ser dependências locais do release preparado;
+- CSP adicionada ao frontend;
+- Service Worker passa a armazenar o app shell e bibliotecas locais para operação offline;
+- documentação de prontidão corporativa e auditoria de segurança adicionadas.
+
 ## v1.8.2 — 2026-08-14
 
 - avatar do perfil corrigido para círculo perfeito;
