@@ -1,8 +1,8 @@
-# Central de Manutenção SE — v1.8.0 Homologação
+# Central de Manutenção SE — v1.8.1 Homologação
 
 Release consolidada de refinamento da Central de Manutenção de ativos de subestação.
 
-## v1.8.0 — Homologação Final de UI/UX
+## v1.8.1 — Homologação Final de UI/UX
 
 Consolida os últimos ajustes de cabeçalho, nomenclatura **Relatórios**, tabela de usuários, KPIs e acabamento dos painéis de exportação/perfil. A atualização a partir da v1.7.0 é somente de frontend/GitHub Pages e não requer SQL ou novo deploy de Edge Functions.
 

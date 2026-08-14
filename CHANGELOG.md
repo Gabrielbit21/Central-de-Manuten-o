@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.8.1 — 2026-08-14
+
+- avatar do perfil corrigido para formato circular real;
+- fechamento dos modais padronizado no X simples do PAM;
+- espaçamento horizontal da navegação superior ampliado mantendo fallback responsivo.
+
 ## v1.8.0 — 2026-08-14
 
 - **Visão geral** renomeada para **Relatórios** no cabeçalho, Home, mobile e título da tela;
