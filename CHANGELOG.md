@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.0 — 2026-08-14
+
+- cabeçalho desktop/notebook com navegação completa ao lado da logo e menu **Mais** adaptativo somente quando faltar espaço;
+- ícone real de sino na Central de Notificações e redução do espaço superior do modal;
+- fechamento com **X** visível/ancorado nos painéis de perfil, atualização em massa e exportação;
+- clique fora do painel não fecha modais;
+- tabela PAM refinada, com melhor contenção horizontal, coluna **Mês**, status por célula colorida e filtro da última coluna reposicionado dentro da viewport;
+- tela de Usuários refinada com linguagem visual corporativa, remoção do banner técnico de VAPID/Web Push e botões mais consistentes;
+- botão **Exportar dados** corrigido para reabrir o painel de exportação;
+- indicadores de Subestações/Ativos reposicionados em cards compactos no cabeçalho do Banco de Dados.
+
 ## v1.6.1 — 2026-08-13
 
 - cabeçalho corrigido para notebooks e larguras intermediárias;
