@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.8.2 — 2026-08-14
+
+- avatar do perfil corrigido para círculo perfeito;
+- indicador redundante de conectividade removido da tela Nova Manutenção.
+
 ## v1.8.1 — 2026-08-14
 
 - avatar do perfil corrigido para formato circular real;
