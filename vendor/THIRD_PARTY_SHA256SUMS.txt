@@ -1,0 +1,2 @@
+9f73dc4c7325b9eca904f9f2798eb7fe96b3caaabcddcf5f4563e90cf52bd835  supabase-js-2.57.4.min.js
+cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41  xlsx-0.20.3.full.min.js
