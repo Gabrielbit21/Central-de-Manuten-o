@@ -37,7 +37,7 @@ jobs:
           module central/launcher
 
           go 1.23
-          '@ | Set-Content -Encoding utf8 tools/winbuild/go.mod
+          '@ | Set-Content -Encoding ascii tools/winbuild/go.mod
 
           @'
           package main
