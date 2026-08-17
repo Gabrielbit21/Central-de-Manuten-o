@@ -1,4 +1,4 @@
-name: Publicar instalador Windows v1.9.0
+name: Publicar Windows Native v1.9.0
 
 on:
   workflow_dispatch:
@@ -7,596 +7,327 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows-native:
     runs-on: windows-latest
 
     steps:
-      - name: Baixar código da v1.9.0 READY
+      - name: Baixar código v1.9.0 READY
         uses: actions/checkout@v4
 
-      - name: Preparar Go
-        uses: actions/setup-go@v5
+      - name: Preparar .NET 8
+        uses: actions/setup-dotnet@v4
         with:
-          go-version: '1.23.x'
-          cache: false
+          dotnet-version: '8.0.x'
 
-      - name: Instalar ferramentas
+      - name: Instalar Inno Setup
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          go install github.com/akavel/rsrc@936343600d578fb5da472acf6987ed76935a389b
           choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar o Inno Setup.' }
 
-      - name: Criar launcher da Central
+      - name: Materializar host Windows nativo
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force tools/winbuild | Out-Null
+          $base64 = @'
+          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
+          ZW5jYW8uV2luL1VUBQADn+2CanV4CwABBAAAAAAE6QMAAFBLAQIeAxQAAAAIAC9bEV3o/zby8xAAAIM/AAAoABgAAAAAAAEAAACkgVgAAAB3aW5kb3dzL0Nl
+          bnRyYWxNYW51dGVuY2FvLldpbi9Qcm9ncmFtLmNzVVQFAAOq74JqdXgLAAEEAAAAAATpAwAAUEsBAh4DFAAAAAgAGFoRXVyJBcajBgAAVhQAAC8AGAAAAAAA
+          AQAAAKSBrREAAHdpbmRvd3MvQ2VudHJhbE1hbnV0ZW5jYW8uV2luL25hdGl2ZS13aW5kb3dzLmpzVVQFAAOf7YJqdXgLAAEEAAAAAATpAwAAUEsBAh4DFAAA
+          AAgAJlsRXXZooYH7AQAAegQAADoAGAAAAAAAAQAAAKSBuRgAAHdpbmRvd3MvQ2VudHJhbE1hbnV0ZW5jYW8uV2luL0NlbnRyYWxNYW51dGVuY2FvLldpbi5j
+          c3Byb2pVVAUAA5jvgmp1eAsAAQQAAAAABOkDAABQSwECHgMUAAAACAAYWhFdT6I1eesDAACdCAAAFQAYAAAAAAABAAAApIEoGwAAd2luZG93cy9pbnN0YWxs
+          ZXIuaXNzVVQFAAOf7YJqdXgLAAEEAAAAAATpAwAAUEsFBgAAAAAFAAUAIgIAAGIfAAAAAA==
+          '@
+          $bytes = [Convert]::FromBase64String(($base64 -replace '\s',''))
+          $zipPath = Join-Path $env:RUNNER_TEMP 'central-native-source.zip'
+          [System.IO.File]::WriteAllBytes($zipPath, $bytes)
+          $expected = '7ef9fc3fe890563230c5d107e5a077239ed8e53ef2f8d75b250b665c4ab57856'
+          $actual = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) { throw "Pacote-fonte nativo inválido. SHA256=$actual" }
+          Expand-Archive -Path $zipPath -DestinationPath . -Force
 
+      - name: Validar fontes e base web
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $required = @(
+            'index.html',
+            'app.js',
+            'sw.js',
+            'manifest.webmanifest',
+            'version.json',
+            'assets/icons/central-manutencao.ico',
+            'vendor/supabase-js-2.57.4.min.js',
+            'vendor/xlsx-0.20.3.full.min.js',
+            'windows/CentralManutencao.Win/CentralManutencao.Win.csproj',
+            'windows/CentralManutencao.Win/Program.cs',
+            'windows/CentralManutencao.Win/native-windows.js',
+            'windows/installer.iss'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path $file)) { throw "Arquivo obrigatório não encontrado: $file" }
+            if ((Get-Item $file).Length -eq 0) { throw "Arquivo obrigatório vazio: $file" }
+          }
+          if ((Get-Item 'vendor/supabase-js-2.57.4.min.js').Length -lt 100000) { throw 'Supabase JS local parece incompleto.' }
+          if ((Get-Item 'vendor/xlsx-0.20.3.full.min.js').Length -lt 900000) { throw 'SheetJS local parece incompleto.' }
+          if (Select-String -Path 'windows/CentralManutencao.Win/Program.cs' -Pattern '127\.0\.0\.1|msedge\.exe|--app=' -Quiet) {
+            throw 'Arquitetura antiga baseada em localhost/Edge detectada. Build abortado.'
+          }
+          node --check app.js
+          if ($LASTEXITCODE -ne 0) { throw 'app.js contém erro de sintaxe.' }
+          node --check windows/CentralManutencao.Win/native-windows.js
+          if ($LASTEXITCODE -ne 0) { throw 'native-windows.js contém erro de sintaxe.' }
+
+      - name: Preparar interface embarcada
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Remove-Item 'windows/stage' -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force 'windows/stage/package/web' | Out-Null
+          New-Item -ItemType Directory -Force 'windows/stage/runtime' | Out-Null
+          New-Item -ItemType Directory -Force 'windows/stage/out' | Out-Null
+
+          Copy-Item 'index.html' 'windows/stage/package/web/index.html'
+          Copy-Item 'app.js' 'windows/stage/package/web/app.js'
+          Copy-Item 'manifest.webmanifest' 'windows/stage/package/web/manifest.webmanifest'
+          Copy-Item 'version.json' 'windows/stage/package/web/version.json'
+          if (Test-Path 'THIRD_PARTY_NOTICES.md') { Copy-Item 'THIRD_PARTY_NOTICES.md' 'windows/stage/package/web/THIRD_PARTY_NOTICES.md' }
+          Copy-Item 'assets' 'windows/stage/package/web/assets' -Recurse
+          Copy-Item 'vendor' 'windows/stage/package/web/vendor' -Recurse
+          Copy-Item 'windows/CentralManutencao.Win/native-windows.js' 'windows/stage/package/web/native-windows.js'
+
+          # No aplicativo nativo não usamos cache PWA. Isso evita uma versão antiga
+          # do frontend permanecer em cache depois de uma atualização do instalador.
           @'
-          module central/launcher
+          self.addEventListener('install', event => { self.skipWaiting(); });
+          self.addEventListener('activate', event => { event.waitUntil(self.clients.claim()); });
+          '@ | Set-Content -Encoding utf8 'windows/stage/package/web/sw.js'
 
-          go 1.23
-          '@ | Set-Content -Encoding ascii tools/winbuild/go.mod
-
-          @'
-          package main
-
-          import (
-              "context"
-              "fmt"
-              "log"
-              "mime"
-              "net"
-              "net/http"
-              "os"
-              "os/exec"
-              "path"
-              "path/filepath"
-              "strings"
-              "syscall"
-              "time"
-              "unsafe"
-          )
-
-          const (
-              appName = "Central de Manutenção SE"
-              port    = "17891"
-          )
-
-          var (
-              user32         = syscall.NewLazyDLL("user32.dll")
-              procMessageBox = user32.NewProc("MessageBoxW")
-          )
-
-          func messageBox(title, text string, flags uintptr) int {
-              t, _ := syscall.UTF16PtrFromString(title)
-              m, _ := syscall.UTF16PtrFromString(text)
-              r, _, _ := procMessageBox.Call(
-                  0,
-                  uintptr(unsafe.Pointer(m)),
-                  uintptr(unsafe.Pointer(t)),
-                  flags,
-              )
-              return int(r)
+          $indexPath = 'windows/stage/package/web/index.html'
+          $html = [System.IO.File]::ReadAllText($indexPath)
+          if ($html -notmatch '<script src="\./native-windows\.js"></script>') {
+            if ($html -notmatch '</body>') { throw 'index.html não contém </body>; injeção nativa abortada.' }
+            $html = $html.Replace('</body>', "<script src=`"./native-windows.js`"></script>`r`n</body>")
+            [System.IO.File]::WriteAllText($indexPath, $html, [System.Text.UTF8Encoding]::new($false))
           }
+          if ((Select-String -Path $indexPath -Pattern 'native-windows.js').Count -ne 1) { throw 'native-windows.js deve aparecer exatamente uma vez no index empacotado.' }
+          if (Select-String -Path $indexPath -Pattern 'cdn\.jsdelivr\.net|cdn\.sheetjs\.com' -Quiet) { throw 'Dependência CDN encontrada no frontend nativo.' }
 
-          func setupLog() *os.File {
-              root := filepath.Join(
-                  os.Getenv("LOCALAPPDATA"),
-                  "CentralManutencaoSE",
-                  "logs",
-              )
-              _ = os.MkdirAll(root, 0755)
+      - name: Compilar aplicativo Windows nativo
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet restore 'windows/CentralManutencao.Win/CentralManutencao.Win.csproj'
+          if ($LASTEXITCODE -ne 0) { throw 'Falha no dotnet restore.' }
+          dotnet publish `
+            'windows/CentralManutencao.Win/CentralManutencao.Win.csproj' `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            --no-restore `
+            -o 'windows/stage/package'
+          if ($LASTEXITCODE -ne 0) { throw 'Falha no dotnet publish.' }
 
-              f, err := os.OpenFile(
-                  filepath.Join(root, "launcher.log"),
-                  os.O_CREATE|os.O_APPEND|os.O_WRONLY,
-                  0644,
-              )
+          $exe = 'windows/stage/package/CentralManutencaoSE.exe'
+          if (-not (Test-Path $exe)) { throw 'CentralManutencaoSE.exe não foi gerado.' }
+          $loader = Get-ChildItem 'windows/stage/package' -Filter 'WebView2Loader.dll' -Recurse -ErrorAction SilentlyContinue
+          if (-not $loader) { throw 'WebView2Loader.dll não foi incluído no pacote.' }
+          $versionInfo = (Get-Item $exe).VersionInfo
+          if ($versionInfo.ProductName -notlike '*Central de Manutenção SE*') { throw "Identidade do executável inválida: $($versionInfo.ProductName)" }
 
-              if err == nil {
-                  log.SetOutput(f)
-                  log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-              }
+      - name: Preparar Runtime WebView2 oficial
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bootstrapper = 'windows/stage/runtime/MicrosoftEdgeWebview2Setup.exe'
+          Invoke-WebRequest `
+            -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' `
+            -OutFile $bootstrapper `
+            -UseBasicParsing
+          if (-not (Test-Path $bootstrapper) -or (Get-Item $bootstrapper).Length -lt 1000000) { throw 'Bootstrapper WebView2 não foi baixado corretamente.' }
+          $signature = Get-AuthenticodeSignature $bootstrapper
+          if ($signature.Status -ne 'Valid') { throw "Assinatura do WebView2 Bootstrapper inválida: $($signature.Status)" }
+          if ($signature.SignerCertificate.Subject -notmatch 'Microsoft') { throw 'O WebView2 Bootstrapper não está assinado pela Microsoft.' }
+          Start-Process -FilePath $bootstrapper -ArgumentList '/silent','/install' -Wait -WindowStyle Hidden
 
-              return f
-          }
-
-          func edgePath() string {
-              candidates := []string{
-                  filepath.Join(
-                      os.Getenv("ProgramFiles(x86)"),
-                      "Microsoft", "Edge", "Application", "msedge.exe",
-                  ),
-                  filepath.Join(
-                      os.Getenv("ProgramFiles"),
-                      "Microsoft", "Edge", "Application", "msedge.exe",
-                  ),
-                  filepath.Join(
-                      os.Getenv("LOCALAPPDATA"),
-                      "Microsoft", "Edge", "Application", "msedge.exe",
-                  ),
-              }
-
-              for _, p := range candidates {
-                  if p == "" {
-                      continue
-                  }
-
-                  if st, err := os.Stat(p); err == nil && !st.IsDir() {
-                      return p
-                  }
-              }
-
-              if p, err := exec.LookPath("msedge.exe"); err == nil {
-                  return p
-              }
-
-              return ""
-          }
-
-          func safeFileHandler(appDir string) http.HandlerFunc {
-              appRoot := filepath.Clean(appDir) + string(os.PathSeparator)
-
-              return func(w http.ResponseWriter, r *http.Request) {
-                  w.Header().Set("X-Content-Type-Options", "nosniff")
-                  w.Header().Set("Referrer-Policy", "no-referrer")
-                  w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
-
-                  cleanURL := path.Clean("/" + r.URL.Path)
-                  rel := strings.TrimPrefix(cleanURL, "/")
-
-                  if rel == "" || rel == "." {
-                      rel = "index.html"
-                  }
-
-                  full := filepath.Clean(
-                      filepath.Join(appDir, filepath.FromSlash(rel)),
-                  )
-
-                  if full != filepath.Clean(appDir) &&
-                      !strings.HasPrefix(full, appRoot) {
-                      http.Error(w, "forbidden", http.StatusForbidden)
-                      return
-                  }
-
-                  st, err := os.Stat(full)
-                  if err != nil || st.IsDir() {
-                      http.NotFound(w, r)
-                      return
-                  }
-
-                  ext := strings.ToLower(filepath.Ext(full))
-
-                  if ext == ".webmanifest" {
-                      w.Header().Set(
-                          "Content-Type",
-                          "application/manifest+json; charset=utf-8",
-                      )
-                  }
-
-                  if ext == ".js" {
-                      w.Header().Set(
-                          "Content-Type",
-                          "text/javascript; charset=utf-8",
-                      )
-                  }
-
-                  if ext == ".json" {
-                      w.Header().Set(
-                          "Content-Type",
-                          "application/json; charset=utf-8",
-                      )
-                  }
-
-                  if ext == ".html" ||
-                      filepath.Base(full) == "sw.js" ||
-                      filepath.Base(full) == "version.json" ||
-                      filepath.Base(full) == "app.js" {
-
-                      w.Header().Set(
-                          "Cache-Control",
-                          "no-cache, no-store, must-revalidate",
-                      )
-                  } else {
-                      w.Header().Set(
-                          "Cache-Control",
-                          "public, max-age=86400",
-                      )
-                  }
-
-                  if w.Header().Get("Content-Type") == "" {
-                      if c := mime.TypeByExtension(ext); c != "" {
-                          w.Header().Set("Content-Type", c)
-                      }
-                  }
-
-                  http.ServeFile(w, r, full)
-              }
-          }
-
-          func launchEdge(url string) (*exec.Cmd, error) {
-              edge := edgePath()
-
-              if edge == "" {
-                  return nil, fmt.Errorf(
-                      "Microsoft Edge não foi encontrado",
-                  )
-              }
-
-              profile := filepath.Join(
-                  os.Getenv("LOCALAPPDATA"),
-                  "CentralManutencaoSE",
-                  "EdgeProfile",
-              )
-
-              _ = os.MkdirAll(profile, 0755)
-
-              args := []string{
-                  "--app=" + url,
-                  "--user-data-dir=" + profile,
-                  "--no-first-run",
-                  "--no-default-browser-check",
-              }
-
-              cmd := exec.Command(edge, args...)
-              cmd.SysProcAttr = &syscall.SysProcAttr{
-                  HideWindow: true,
-              }
-
-              if err := cmd.Start(); err != nil {
-                  return nil, err
-              }
-
-              return cmd, nil
-          }
-
-          func main() {
-              lf := setupLog()
-
-              if lf != nil {
-                  defer lf.Close()
-              }
-
-              exe, err := os.Executable()
-
-              if err != nil {
-                  messageBox(
-                      appName,
-                      "Não foi possível localizar a instalação.",
-                      0x10,
-                  )
-                  return
-              }
-
-              appDir := filepath.Join(
-                  filepath.Dir(exe),
-                  "web",
-              )
-
-              if _, err := os.Stat(
-                  filepath.Join(appDir, "index.html"),
-              ); err != nil {
-                  messageBox(
-                      appName,
-                      "Arquivos do aplicativo não foram encontrados. Reinstale a Central de Manutenção.",
-                      0x10,
-                  )
-                  return
-              }
-
-              addr := "127.0.0.1:" + port
-              url := "http://" + addr + "/"
-
-              ln, err := net.Listen("tcp", addr)
-
-              if err != nil {
-                  conn, dialErr := net.DialTimeout(
-                      "tcp",
-                      addr,
-                      800*time.Millisecond,
-                  )
-
-                  if dialErr == nil {
-                      _ = conn.Close()
-
-                      if _, launchErr := launchEdge(url); launchErr != nil {
-                          messageBox(
-                              appName,
-                              launchErr.Error(),
-                              0x10,
-                          )
-                      }
-
-                      return
-                  }
-
-                  messageBox(
-                      appName,
-                      "Não foi possível iniciar o serviço local da Central. A porta 17891 está indisponível.",
-                      0x10,
-                  )
-                  return
-              }
-
-              server := &http.Server{
-                  Handler:           safeFileHandler(appDir),
-                  ReadHeaderTimeout: 8 * time.Second,
-                  IdleTimeout:       60 * time.Second,
-              }
-
-              go func() {
-                  if err := server.Serve(ln); err != nil &&
-                      err != http.ErrServerClosed {
-                      log.Printf("http server: %v", err)
-                  }
-              }()
-
-              cmd, err := launchEdge(url)
-
-              if err != nil {
-                  _ = server.Shutdown(context.Background())
-
-                  messageBox(
-                      appName,
-                      "Não foi possível abrir a Central de Manutenção.\n\n"+
-                          err.Error(),
-                      0x10,
-                  )
-                  return
-              }
-
-              _ = cmd.Wait()
-
-              ctx, cancel := context.WithTimeout(
-                  context.Background(),
-                  3*time.Second,
-              )
-              defer cancel()
-
-              _ = server.Shutdown(ctx)
-          }
-          '@ | Set-Content -Encoding utf8 tools/winbuild/main.go
-
-          Push-Location tools/winbuild
-
-          rsrc `
-            -ico ../../assets/icons/central-manutencao.ico `
-            -arch amd64 `
-            -o rsrc_windows_amd64.syso
-
-          go build `
-            -trimpath `
-            -ldflags '-H=windowsgui -s -w' `
-            -o CentralManutencaoSE.exe .
-
-          Pop-Location
+      - name: Testar executável antes do instalador
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'windows/stage/package/CentralManutencaoSE.exe'
+          & $exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Self-test do aplicativo falhou com código $LASTEXITCODE." }
 
       - name: Gerar instalador
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            dist/windows | Out-Null
-
-          @'
-          #define MyAppName "Central de Manutenção SE"
-          #define MyAppVersion "1.9.0"
-          #define MyAppExeName "CentralManutencaoSE.exe"
-
-          [Setup]
-          AppId={{A30BF697-8C8A-43EA-B6B6-3E77B498D30F}
-          AppName={#MyAppName}
-          AppVersion={#MyAppVersion}
-          AppPublisher=Central de Manutenção SE
-          DefaultDirName={localappdata}\Programs\CentralManutencaoSE
-          DefaultGroupName={#MyAppName}
-          DisableProgramGroupPage=yes
-          PrivilegesRequired=lowest
-          ArchitecturesAllowed=x64compatible
-          ArchitecturesInstallIn64BitMode=x64compatible
-          SetupIconFile=..\..\assets\icons\central-manutencao.ico
-          UninstallDisplayIcon={app}\web\assets\icons\central-manutencao.ico
-          OutputDir=..\..\dist\windows
-          OutputBaseFilename=Central_Manutencao_SE_Setup_v1.9.0
-          Compression=lzma2/ultra64
-          SolidCompression=yes
-          WizardStyle=modern
-          CloseApplications=yes
-          RestartApplications=no
-
-          [Files]
-          Source: "CentralManutencaoSE.exe"; DestDir: "{app}"; Flags: ignoreversion
-          Source: "..\..\index.html"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\app.js"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\sw.js"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\manifest.webmanifest"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\version.json"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\web"; Flags: ignoreversion
-          Source: "..\..\assets\*"; DestDir: "{app}\web\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "..\..\vendor\*"; DestDir: "{app}\web\vendor"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-          [Icons]
-          Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\web\assets\icons\central-manutencao.ico"
-          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\web\assets\icons\central-manutencao.ico"
-
-          [Run]
-          Filename: "{app}\{#MyAppExeName}"; Description: "Abrir {#MyAppName}"; Flags: nowait postinstall skipifsilent
-
-          [UninstallDelete]
-          Type: filesandordirs; Name: "{localappdata}\CentralManutencaoSE"
-          '@ | Set-Content `
-            -Encoding utf8 `
-            tools/winbuild/installer.iss
-
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'Compilador do Inno Setup não encontrado.' }
+          & $iscc 'windows/installer.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o instalador.' }
+          $setup = 'windows/stage/out/Central_Manutencao_SE_Setup_v1.9.0_Native.exe'
+          if (-not (Test-Path $setup)) { throw 'Instalador final não foi gerado.' }
+          if ((Get-Item $setup).Length -lt 10000000) { throw 'Instalador final parece incompleto.' }
 
-          if (-not (Test-Path $iscc)) {
-              throw 'Inno Setup não encontrado.'
-          }
-
-          & $iscc tools/winbuild/installer.iss
-
-      - name: Gerar checksum e pacote ZIP
+      - name: Gerar pacote e checksum
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-
-          $exe = 'dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe'
-
-          $hash = (
-              Get-FileHash $exe -Algorithm SHA256
-          ).Hash.ToLower()
-
-          "$hash  Central_Manutencao_SE_Setup_v1.9.0.exe" |
-              Set-Content `
-                -Encoding ascii `
-                'dist/windows/SHA256_WINDOWS_V1.9.0.txt'
-
+          New-Item -ItemType Directory -Force 'dist/windows-native' | Out-Null
+          $setupSource = 'windows/stage/out/Central_Manutencao_SE_Setup_v1.9.0_Native.exe'
+          $setupDest = 'dist/windows-native/Central_Manutencao_SE_Setup_v1.9.0_Native.exe'
+          Copy-Item $setupSource $setupDest
+          $hash = (Get-FileHash $setupDest -Algorithm SHA256).Hash.ToLower()
+          "$hash  Central_Manutencao_SE_Setup_v1.9.0_Native.exe" | Set-Content -Encoding ascii 'dist/windows-native/SHA256_WINDOWS_NATIVE_V1.9.0.txt'
           @'
-          # Central de Manutenção SE — Windows v1.9.0
+          # Central de Manutenção SE v1.9.0 - Windows Native
 
-          - Windows 10/11 x64
-          - Instalação por usuário
-          - Mesmo ícone do PWA
-          - Front-end e bibliotecas JavaScript incorporados
-          - Backend Supabase compartilhado
-          - Requer Microsoft Edge
-          - Sem assinatura Authenticode comercial
-          '@ | Set-Content `
-            -Encoding utf8 `
-            'dist/windows/INSTALADOR_WINDOWS_V1.9.0.md'
+          - Host Windows nativo WinForms + Microsoft WebView2.
+          - Não abre Microsoft Edge e não usa localhost/127.0.0.1.
+          - .NET 8 self-contained x64.
+          - Frontend v1.9.0 READY e bibliotecas JavaScript incorporados.
+          - Mesmo ícone do PWA.
+          - Exportações usam a janela nativa Salvar como do Windows.
+          - Ao fechar a janela, a Central permanece na área de notificação; use Sair no ícone para encerrar.
+          - Notificações no EXE são entregues pela integração nativa enquanto a Central estiver em execução.
+          - WebView2 Runtime Evergreen oficial da Microsoft é instalado somente se necessário.
+          - Este instalador ainda não possui assinatura Authenticode comercial.
+          '@ | Set-Content -Encoding utf8 'dist/windows-native/LEIA-ME.txt'
+          Compress-Archive -Path 'dist/windows-native/*' -DestinationPath 'dist/Central_Manutencao_SE_Windows_Native_v1.9.0.zip' -Force
 
-          Compress-Archive `
-            -Path 'dist/windows/*' `
-            -DestinationPath 'dist/Central_Manutencao_SE_Windows_v1.9.0.zip' `
-            -Force
-
-          @'
-          # Central de Manutenção SE v1.9.0 — Windows
-
-          Instalador Windows x64 gerado diretamente da versão
-          v1.9.0 READY publicada neste repositório.
-
-          O pacote usa o mesmo ícone do PWA e mantém as
-          dependências JavaScript localmente.
-          '@ | Set-Content `
-            -Encoding utf8 `
-            'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
-
-      - name: Guardar artefato
+      - name: Guardar artefato validado
         uses: actions/upload-artifact@v4
         with:
-          name: Central-Manutencao-SE-Windows-v1.9.0
+          name: Central-Manutencao-SE-Windows-Native-v1.9.0
           path: |
-            dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe
-            dist/windows/SHA256_WINDOWS_V1.9.0.txt
-            dist/windows/INSTALADOR_WINDOWS_V1.9.0.md
-            dist/Central_Manutencao_SE_Windows_v1.9.0.zip
+            dist/windows-native/Central_Manutencao_SE_Setup_v1.9.0_Native.exe
+            dist/windows-native/SHA256_WINDOWS_NATIVE_V1.9.0.txt
+            dist/windows-native/LEIA-ME.txt
+            dist/Central_Manutencao_SE_Windows_Native_v1.9.0.zip
           if-no-files-found: error
 
-            - name: Publicar em Releases
+      - name: Publicar Release Windows Native
         shell: powershell
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-
+          $PSNativeCommandUseErrorActionPreference = $false
           $repo = '${{ github.repository }}'
-          $tag = 'windows-v1.9.0'
-          $title = 'Central de Manutenção SE v1.9.0 — Windows'
-
+          $tag = 'windows-native-v1.9.0'
           $assets = @(
-            'dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe',
-            'dist/windows/SHA256_WINDOWS_V1.9.0.txt',
-            'dist/windows/INSTALADOR_WINDOWS_V1.9.0.md',
-            'dist/Central_Manutencao_SE_Windows_v1.9.0.zip'
+            'dist/windows-native/Central_Manutencao_SE_Setup_v1.9.0_Native.exe',
+            'dist/windows-native/SHA256_WINDOWS_NATIVE_V1.9.0.txt',
+            'dist/windows-native/LEIA-ME.txt',
+            'dist/Central_Manutencao_SE_Windows_Native_v1.9.0.zip'
           )
+          foreach ($asset in $assets) { if (-not (Test-Path $asset)) { throw "Asset ausente: $asset" } }
 
-          # Falhar claramente se algum arquivo não existir.
-          foreach ($asset in $assets) {
-            if (-not (Test-Path $asset)) {
-              throw "Arquivo obrigatório não encontrado: $asset"
-            }
-          }
+          gh release view $tag --repo $repo *> $null
+          $exists = ($LASTEXITCODE -eq 0)
 
-          # Verificar a Release pela API sem transformar um 404 esperado
-          # em falha do workflow.
-          $headers = @{
-            Authorization = "Bearer $env:GH_TOKEN"
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          }
-
-          $releaseUrl = "https://api.github.com/repos/$repo/releases/tags/$tag"
-          $releaseExists = $false
-
-          try {
-            Invoke-RestMethod `
-              -Uri $releaseUrl `
-              -Headers $headers `
-              -Method Get `
-              -ErrorAction Stop | Out-Null
-
-            $releaseExists = $true
-          }
-          catch {
-            $statusCode = $null
-
-            if ($_.Exception.Response) {
-              $statusCode = [int]$_.Exception.Response.StatusCode
-            }
-
-            if ($statusCode -eq 404) {
-              Write-Host "Release ainda não existe. Será criada."
-              $releaseExists = $false
-            }
-            else {
-              throw
-            }
-          }
-
-          if ($releaseExists) {
-            Write-Host "Release existente. Atualizando arquivos..."
-
-            gh release upload `
-              $tag `
-              $assets `
-              --repo $repo `
-              --clobber
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Falha ao atualizar os arquivos da Release."
-            }
-          }
-          else {
-            Write-Host "Criando primeira Release..."
-
-            gh release create `
-              $tag `
-              $assets `
+          if ($exists) {
+            gh release upload $tag @assets --repo $repo --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Falha ao atualizar assets da Release.' }
+          } else {
+            gh release create $tag @assets `
               --repo $repo `
               --target '${{ github.sha }}' `
-              --title $title `
-              --notes-file 'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Falha ao criar a Release."
-            }
+              --title 'Central de Manutenção SE v1.9.0 - Windows Native' `
+              --notes 'Build Windows nativo validado automaticamente antes da publicação. Sem localhost e sem janela do navegador.'
+            if ($LASTEXITCODE -ne 0) { throw 'Falha ao criar a Release Windows Native.' }
           }
 
-          # Confirmação final.
-          gh release view `
-            $tag `
-            --repo $repo `
-            --json tagName,name,url
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "A Release não pôde ser validada após a publicação."
-          }
-
-          Write-Host "Release Windows v1.9.0 publicada com sucesso."
+          gh release view $tag --repo $repo --json tagName,name,url
+          if ($LASTEXITCODE -ne 0) { throw 'A Release não pôde ser validada após a publicação.' }
