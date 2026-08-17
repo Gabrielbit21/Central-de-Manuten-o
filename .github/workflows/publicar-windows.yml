@@ -499,14 +499,16 @@ jobs:
             dist/Central_Manutencao_SE_Windows_v1.9.0.zip
           if-no-files-found: error
 
-      - name: Publicar em Releases
+            - name: Publicar em Releases
         shell: powershell
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = 'Stop'
 
+          $repo = '${{ github.repository }}'
           $tag = 'windows-v1.9.0'
+          $title = 'Central de Manutenção SE v1.9.0 — Windows'
 
           $assets = @(
             'dist/windows/Central_Manutencao_SE_Setup_v1.9.0.exe',
@@ -515,16 +517,86 @@ jobs:
             'dist/Central_Manutencao_SE_Windows_v1.9.0.zip'
           )
 
-          gh release view $tag *> $null
+          # Falhar claramente se algum arquivo não existir.
+          foreach ($asset in $assets) {
+            if (-not (Test-Path $asset)) {
+              throw "Arquivo obrigatório não encontrado: $asset"
+            }
+          }
 
-          if ($LASTEXITCODE -eq 0) {
-              gh release upload $tag @assets --clobber
+          # Verificar a Release pela API sem transformar um 404 esperado
+          # em falha do workflow.
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          $releaseUrl = "https://api.github.com/repos/$repo/releases/tags/$tag"
+          $releaseExists = $false
+
+          try {
+            Invoke-RestMethod `
+              -Uri $releaseUrl `
+              -Headers $headers `
+              -Method Get `
+              -ErrorAction Stop | Out-Null
+
+            $releaseExists = $true
+          }
+          catch {
+            $statusCode = $null
+
+            if ($_.Exception.Response) {
+              $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+
+            if ($statusCode -eq 404) {
+              Write-Host "Release ainda não existe. Será criada."
+              $releaseExists = $false
+            }
+            else {
+              throw
+            }
+          }
+
+          if ($releaseExists) {
+            Write-Host "Release existente. Atualizando arquivos..."
+
+            gh release upload `
+              $tag `
+              $assets `
+              --repo $repo `
+              --clobber
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Falha ao atualizar os arquivos da Release."
+            }
           }
           else {
-              gh release create `
-                $tag `
-                @assets `
-                --target '${{ github.sha }}' `
-                --title 'Central de Manutenção SE v1.9.0 — Windows' `
-                --notes-file 'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
+            Write-Host "Criando primeira Release..."
+
+            gh release create `
+              $tag `
+              $assets `
+              --repo $repo `
+              --target '${{ github.sha }}' `
+              --title $title `
+              --notes-file 'dist/RELEASE_NOTES_WINDOWS_V1.9.0.md'
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Falha ao criar a Release."
+            }
           }
+
+          # Confirmação final.
+          gh release view `
+            $tag `
+            --repo $repo `
+            --json tagName,name,url
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "A Release não pôde ser validada após a publicação."
+          }
+
+          Write-Host "Release Windows v1.9.0 publicada com sucesso."
