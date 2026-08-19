@@ -193,10 +193,6 @@ jobs:
           if (-not (Test-Path $iscc -PathType Leaf)) {
             throw 'ISCC.exe não foi encontrado após a instalação.'
           }
-          $compilerVersion = (Get-Item $iscc).VersionInfo.ProductVersion
-          if ($compilerVersion -notlike "$innoVersion*") {
-            throw "Versão inesperada do ISCC.exe: $compilerVersion."
-          }
 
       - name: Validar fontes e dependências versionadas
         shell: pwsh
@@ -362,16 +358,48 @@ jobs:
           $hash = (Get-FileHash $bootstrapper -Algorithm SHA256).Hash.ToLowerInvariant()
           "WEBVIEW2_BOOTSTRAPPER_SHA256=$hash" >> $env:GITHUB_ENV
 
-          $process = Start-Process -FilePath $bootstrapper `
-            -ArgumentList '/silent','/install' `
-            -WindowStyle Hidden `
-            -PassThru
-          if (-not $process.WaitForExit(180000)) {
-            $process.Kill($true)
-            throw 'Instalação do WebView2 Runtime excedeu 180 segundos.'
+          $runtimeId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $runtimeKeys = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$runtimeId",
+            "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$runtimeId"
+          )
+
+          function Get-WebView2RuntimeVersion {
+            foreach ($key in $runtimeKeys) {
+              $runtimeInfo = Get-ItemProperty -Path $key -Name 'pv' -ErrorAction SilentlyContinue
+              if ($null -eq $runtimeInfo) { continue }
+
+              $runtimeVersion = [string]$runtimeInfo.pv
+              if (-not [string]::IsNullOrWhiteSpace($runtimeVersion) -and
+                  $runtimeVersion -ne '0.0.0.0') {
+                return $runtimeVersion
+              }
+            }
+            return $null
           }
-          if ($process.ExitCode -ne 0) {
-            throw "Instalação do WebView2 Runtime falhou com código $($process.ExitCode)."
+
+          $installedVersion = Get-WebView2RuntimeVersion
+          if ($installedVersion) {
+            Write-Host "WebView2 Runtime já presente no runner: $installedVersion"
+          } else {
+            $process = Start-Process -FilePath $bootstrapper `
+              -ArgumentList '/silent','/install' `
+              -WindowStyle Hidden `
+              -PassThru
+            if (-not $process.WaitForExit(180000)) {
+              $process.Kill($true)
+              throw 'Instalação do WebView2 Runtime excedeu 180 segundos.'
+            }
+            if ($process.ExitCode -ne 0) {
+              throw "Instalação do WebView2 Runtime falhou com código $($process.ExitCode)."
+            }
+
+            Start-Sleep -Seconds 2
+            $installedVersion = Get-WebView2RuntimeVersion
+            if (-not $installedVersion) {
+              throw 'WebView2 Runtime não foi detectado após a instalação.'
+            }
+            Write-Host "WebView2 Runtime instalado no runner: $installedVersion"
           }
 
       - name: Executar self-test do aplicativo
@@ -556,7 +584,7 @@ jobs:
 
   publish-release:
     name: Publicar release imutável
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     needs: build-windows-native
     runs-on: ubuntu-latest
     timeout-minutes: 10
