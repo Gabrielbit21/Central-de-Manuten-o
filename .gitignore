@@ -1,0 +1,5 @@
+# Windows native build output
+windows/stage/
+windows/**/bin/
+windows/**/obj/
+dist/
