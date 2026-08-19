@@ -1,0 +1,2 @@
+# Dependências vendorizadas devem permanecer byte a byte idênticas
+vendor/** -text
