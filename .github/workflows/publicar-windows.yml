@@ -113,7 +113,7 @@ jobs:
           if ($webViewPackage.Count -ne 1) {
             throw 'O projeto deve conter exatamente uma referência Microsoft.Web.WebView2.'
           }
-          $webViewVersion = [string]$webViewPackage[0].Version
+          $webViewVersion = [string]$webViewPackage[0].GetAttribute('Version')
           if ($webViewVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
             throw "Versão do pacote Microsoft.Web.WebView2 não está fixada: '$webViewVersion'."
           }
