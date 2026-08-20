@@ -1,7 +1,7 @@
 /*
- * Ajustes exclusivos do Android Native.
- * Este arquivo é injetado somente no bundle mobile pelo prepare-web.mjs.
- * A PWA e o Windows não são alterados.
+ * Ajustes exclusivos do Android Native — v3.
+ * Este arquivo é injetado somente no bundle mobile.
+ * Windows e PWA permanecem sem alterações.
  */
 
 :root{
@@ -9,38 +9,155 @@
   --mobile-safe-bottom:var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --mobile-safe-left:var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
   --mobile-safe-right:var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --mobile-header-height:60px;
+  --mobile-nav-height:62px;
 }
 
 html{
   background:#fff;
 }
 
+/*
+ * IMPORTANTE:
+ * Não aplicar o safe-area no body. No ajuste anterior isso somava o inset
+ * ao "top" do header sticky e gerava um espaço duplo acima do cabeçalho.
+ */
 body{
-  padding-top:var(--mobile-safe-top);
-  padding-left:var(--mobile-safe-left);
-  padding-right:var(--mobile-safe-right);
+  padding:0!important;
 }
 
-.top-shell{
-  top:var(--mobile-safe-top)!important;
+/* Faixa do sistema Android: fundo sólido atrás de relógio, rede e bateria. */
+body::before{
+  content:"";
+  position:fixed;
+  z-index:80;
+  top:0;
+  left:0;
+  right:0;
+  height:var(--mobile-safe-top);
+  background:#fff;
+  pointer-events:none;
 }
 
-/* Mantém a navegação móvel acima da barra/gesto do Android. */
+/*
+ * Experiência "app nativo":
+ * cabeçalho e navegação inferior ficam fixos;
+ * somente o conteúdo central rola.
+ */
 @media(max-width:760px){
-  main{
-    padding-bottom:calc(82px + var(--mobile-safe-bottom))!important;
+  #app-shell>.top-shell{
+    position:fixed!important;
+    z-index:70!important;
+    top:var(--mobile-safe-top)!important;
+    left:var(--mobile-safe-left)!important;
+    right:var(--mobile-safe-right)!important;
+    width:auto!important;
+    margin:0!important;
+    background:#fff!important;
+    border-bottom:1px solid var(--line)!important;
+    box-shadow:0 2px 10px rgba(25,58,75,.05);
+  }
+
+  #app-shell>.top-shell .topbar{
+    height:var(--mobile-header-height)!important;
+  }
+
+  #app-shell>main{
+    /*
+     * O header saiu do fluxo por ser fixed.
+     * Reservamos exatamente uma vez a status bar + altura do cabeçalho.
+     */
+    padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
+    padding-bottom:calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 22px)!important;
+  }
+
+  /* Regras específicas que no CSS principal alteram o padding do home. */
+  #app-shell>main:has(> .home-hero){
+    padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
   }
 
   .mobile-nav{
+    position:fixed!important;
+    z-index:75!important;
     left:var(--mobile-safe-left)!important;
     right:var(--mobile-safe-right)!important;
+    bottom:0!important;
+    min-height:calc(var(--mobile-nav-height) + var(--mobile-safe-bottom))!important;
     padding-bottom:var(--mobile-safe-bottom)!important;
+    background:#fff!important;
+  }
+
+  /*
+   * Modais convencionais: cartão centralizado no viewport útil.
+   * Corrige telas que encostavam na borda direita em alguns Androids.
+   */
+  .modal:not(#mobile-more-modal){
+    padding:
+      calc(var(--mobile-safe-top) + 12px)
+      12px
+      calc(var(--mobile-safe-bottom) + 12px)!important;
+    place-items:center!important;
+    justify-items:center!important;
+  }
+
+  .modal:not(#mobile-more-modal)>.modal-card,
+  .profile-settings-dialog,
+  .bulk-update-card,
+  .notification-center-card,
+  .data-export-dialog,
+  .report-modal-card{
+    box-sizing:border-box!important;
+    width:calc(100vw - 28px)!important;
+    max-width:min(680px, calc(100vw - 28px))!important;
+    max-height:calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 28px)!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    justify-self:center!important;
+    align-self:center!important;
+  }
+
+  /* Atualização em massa pode ser longa: mantém rolagem dentro do cartão. */
+  .bulk-update-card,
+  .profile-settings-dialog,
+  .notification-center-card,
+  .data-export-dialog,
+  .report-modal-card{
+    overflow:auto!important;
+  }
+
+  /*
+   * "Mais opções" continua como bottom sheet, mas fica simétrico:
+   * pequena margem nas duas laterais e rodapé sempre visível.
+   */
+  #mobile-more-modal{
+    padding:
+      calc(var(--mobile-safe-top) + var(--mobile-header-height) + 10px)
+      12px
+      calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 10px)!important;
+    place-items:end center!important;
+  }
+
+  #mobile-more-modal>.mobile-more-sheet{
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:680px!important;
+    margin:0 auto!important;
+    border-radius:20px!important;
+    max-height:calc(
+      100dvh
+      - var(--mobile-safe-top)
+      - var(--mobile-header-height)
+      - var(--mobile-nav-height)
+      - var(--mobile-safe-bottom)
+      - 28px
+    )!important;
+    overflow:auto!important;
   }
 }
 
 /*
  * Banco de Dados no celular:
- * evita que as duas ações administrativas disputem largura.
+ * ações em uma coluna para não disputar largura.
  */
 @media(max-width:560px){
   .database-admin-actions,
