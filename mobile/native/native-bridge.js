@@ -8,10 +8,15 @@ const isAndroidNative = () =>
   window.Capacitor?.isNativePlatform?.() === true &&
   window.Capacitor?.getPlatform?.() === 'android';
 
+const PENDING_CAMERA_KEY = 'central_mobile_pending_camera_v2';
+let activePickerPromise = null;
+
 if (isAndroidNative()) {
+  exposeNativeApi();
   installAndroidBackButton();
-  installNativeImagePicker();
+  installNativeImageInputBridge();
   installNativeFileSharing();
+  installRestoredCameraHandler();
 }
 
 function isVisible(element) {
@@ -88,9 +93,6 @@ async function installAndroidBackButton() {
   });
 }
 
-const PENDING_CAMERA_INPUT_KEY = 'central_mobile_pending_camera_input';
-let imagePickerBusy = false;
-
 function ensureInputId(input) {
   if (input.id) return input.id;
   input.id = `central-native-file-${crypto.randomUUID?.() || Date.now()}`;
@@ -126,12 +128,27 @@ function dispatchFilesToInput(input, files) {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-async function chooseNativeImages(input) {
-  const inputId = ensureInputId(input);
-  localStorage.setItem(PENDING_CAMERA_INPUT_KEY, inputId);
+function setPendingCamera(meta) {
+  try {
+    localStorage.setItem(PENDING_CAMERA_KEY, JSON.stringify(meta || {}));
+  } catch {}
+}
 
-  const result = await ActionSheet.showActions({
-    title: 'Adicionar foto',
+function getPendingCamera() {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_CAMERA_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingCamera() {
+  try { localStorage.removeItem(PENDING_CAMERA_KEY); } catch {}
+}
+
+async function runImagePicker({ multiple = false, title = 'Adicionar foto', context = null, inputId = null } = {}) {
+  const action = await ActionSheet.showActions({
+    title,
     options: [
       { title: 'Tirar foto' },
       { title: 'Escolher da galeria' },
@@ -140,14 +157,21 @@ async function chooseNativeImages(input) {
     cancelable: true,
   });
 
-  if (result.canceled || result.index < 0 || result.index === 2) {
-    localStorage.removeItem(PENDING_CAMERA_INPUT_KEY);
-    return;
+  if (action.canceled || action.index < 0 || action.index === 2) {
+    clearPendingCamera();
+    return [];
   }
 
-  let mediaResults = [];
-  if (result.index === 0) {
-    mediaResults = [await Camera.takePhoto({
+  setPendingCamera({
+    mode: inputId ? 'input' : 'direct',
+    inputId: inputId || null,
+    context: context || null,
+    multiple: Boolean(multiple),
+  });
+
+  let results = [];
+  if (action.index === 0) {
+    results = [await Camera.takePhoto({
       quality: 88,
       saveToGallery: false,
       includeMetadata: true,
@@ -155,61 +179,105 @@ async function chooseNativeImages(input) {
   } else {
     const gallery = await Camera.chooseFromGallery({
       quality: 88,
-      allowMultipleSelection: Boolean(input.multiple),
-      limit: input.multiple ? 12 : 1,
+      allowMultipleSelection: Boolean(multiple),
+      limit: multiple ? 12 : 1,
       includeMetadata: true,
     });
-    mediaResults = gallery.results || [];
+    results = gallery.results || [];
   }
 
-  if (!mediaResults.length) {
-    localStorage.removeItem(PENDING_CAMERA_INPUT_KEY);
-    return;
+  if (!results.length) {
+    clearPendingCamera();
+    return [];
   }
 
-  const files = await Promise.all(mediaResults.map(mediaResultToFile));
-  dispatchFilesToInput(input, files);
-  localStorage.removeItem(PENDING_CAMERA_INPUT_KEY);
+  const files = await Promise.all(results.map(mediaResultToFile));
+  clearPendingCamera();
+  return files;
 }
 
-function installNativeImagePicker() {
+async function pickImages(options = {}) {
+  if (!isAndroidNative()) return [];
+
+  // Uma única sessão nativa por vez. Chamadas simultâneas aguardam a sessão já aberta.
+  if (activePickerPromise) return activePickerPromise;
+
+  activePickerPromise = runImagePicker(options);
+  try {
+    return await activePickerPromise;
+  } catch (error) {
+    clearPendingCamera();
+    throw error;
+  } finally {
+    activePickerPromise = null;
+  }
+}
+
+function exposeNativeApi() {
+  window.CentralNativeAndroid = Object.freeze({
+    isAvailable: () => true,
+    pickImages: (options = {}) => pickImages(options),
+    pickImage: async (options = {}) => (await pickImages({ ...options, multiple: false }))[0] || null,
+  });
+}
+
+function installNativeImageInputBridge() {
   document.addEventListener('click', async (event) => {
-    const input = event.target instanceof Element ? event.target.closest('input[type="file"]') : null;
-    if (!isImageInput(input) || imagePickerBusy) return;
+    const input = event.target instanceof Element
+      ? event.target.closest('input[type="file"]')
+      : null;
+    if (!isImageInput(input)) return;
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    imagePickerBusy = true;
 
+    const inputId = ensureInputId(input);
     try {
-      await chooseNativeImages(input);
+      const files = await pickImages({
+        multiple: Boolean(input.multiple),
+        title: 'Adicionar foto',
+        inputId,
+      });
+      if (files.length) dispatchFilesToInput(input, files);
     } catch (error) {
       const message = String(error?.message || error || 'Falha ao abrir câmera/galeria.');
       if (!/cancel|cancelado|canceled/i.test(message)) {
         console.error('Camera:', error);
         alert(`Não foi possível adicionar a foto.\n${message}`);
       }
-      localStorage.removeItem(PENDING_CAMERA_INPUT_KEY);
-    } finally {
-      imagePickerBusy = false;
+      clearPendingCamera();
     }
   }, true);
+}
 
+function installRestoredCameraHandler() {
   App.addListener('appRestoredResult', async (event) => {
     if (event.pluginId !== 'Camera' || !event.success || !event.data) return;
-    const inputId = localStorage.getItem(PENDING_CAMERA_INPUT_KEY);
-    if (!inputId) return;
-    const input = document.getElementById(inputId);
-    if (!isImageInput(input)) return;
+
+    const pending = getPendingCamera();
+    if (!pending) return;
 
     try {
-      const results = Array.isArray(event.data?.results) ? event.data.results : [event.data];
+      const results = Array.isArray(event.data?.results)
+        ? event.data.results
+        : [event.data];
       const files = await Promise.all(results.filter(Boolean).map(mediaResultToFile));
-      if (files.length) dispatchFilesToInput(input, files);
+      if (!files.length) return;
+
+      if (pending.mode === 'input' && pending.inputId) {
+        const input = document.getElementById(pending.inputId);
+        if (isImageInput(input)) dispatchFilesToInput(input, files);
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent('central-native-images-restored', {
+        detail: { files, context: pending.context || null },
+      }));
     } catch (error) {
       console.error('Camera restored result:', error);
     } finally {
-      localStorage.removeItem(PENDING_CAMERA_INPUT_KEY);
+      clearPendingCamera();
+      activePickerPromise = null;
     }
   });
 }

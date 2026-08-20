@@ -180,3 +180,57 @@ body::before{
     text-align:center!important;
   }
 }
+
+/* ===== Android Native — fotos de ativo/perfil (correção consolidada) ===== */
+@media(max-width:760px){
+  /* Depois que existe uma foto, mantém uma ação explícita e tocável. */
+  .asset-profile-frame.has-photo .asset-profile-action{
+    opacity:1!important;
+    inset:auto 8px 8px 8px!important;
+    min-height:34px!important;
+    border-radius:9px!important;
+    background:rgba(0,86,110,.88)!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:7px 10px!important;
+  }
+
+  /* Foto da ficha do Banco de Dados ganha a mesma ação da manutenção. */
+  #asset-modal .asset-modal-photo.android-photo-editable{
+    position:relative!important;
+    overflow:hidden!important;
+  }
+  #asset-modal .android-asset-photo-action{
+    position:absolute!important;
+    left:8px!important;
+    right:8px!important;
+    bottom:8px!important;
+    z-index:4!important;
+    min-height:38px!important;
+    border:0!important;
+    border-radius:10px!important;
+    padding:8px 10px!important;
+    background:rgba(0,86,110,.90)!important;
+    color:#fff!important;
+    font-weight:850!important;
+    font-size:11px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:7px!important;
+    box-shadow:0 5px 16px rgba(0,0,0,.15)!important;
+  }
+  #asset-modal .android-asset-photo-action .ui-icon{
+    width:18px!important;
+    height:18px!important;
+  }
+
+  /* O modal de perfil deve ser perceptível imediatamente ao toque. */
+  #my-profile-modal .profile-settings-dialog,
+  #profile-photo-modal .profile-photo-dialog{
+    transform:translateZ(0);
+    opacity:1!important;
+    visibility:visible!important;
+  }
+}
