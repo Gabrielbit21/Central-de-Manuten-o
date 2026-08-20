@@ -8,5 +8,13 @@
   "android": {
     "backgroundColor": "#ffffff",
     "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "LIGHT",
+      "hidden": false,
+      "animation": "NONE"
+    }
   }
 }

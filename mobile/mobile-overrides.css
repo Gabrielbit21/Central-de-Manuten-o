@@ -1,0 +1,65 @@
+/*
+ * Ajustes exclusivos do Android Native.
+ * Este arquivo é injetado somente no bundle mobile pelo prepare-web.mjs.
+ * A PWA e o Windows não são alterados.
+ */
+
+:root{
+  --mobile-safe-top:var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --mobile-safe-bottom:var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --mobile-safe-left:var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --mobile-safe-right:var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+
+html{
+  background:#fff;
+}
+
+body{
+  padding-top:var(--mobile-safe-top);
+  padding-left:var(--mobile-safe-left);
+  padding-right:var(--mobile-safe-right);
+}
+
+.top-shell{
+  top:var(--mobile-safe-top)!important;
+}
+
+/* Mantém a navegação móvel acima da barra/gesto do Android. */
+@media(max-width:760px){
+  main{
+    padding-bottom:calc(82px + var(--mobile-safe-bottom))!important;
+  }
+
+  .mobile-nav{
+    left:var(--mobile-safe-left)!important;
+    right:var(--mobile-safe-right)!important;
+    padding-bottom:var(--mobile-safe-bottom)!important;
+  }
+}
+
+/*
+ * Banco de Dados no celular:
+ * evita que as duas ações administrativas disputem largura.
+ */
+@media(max-width:560px){
+  .database-admin-actions,
+  .database-heading-premium .database-admin-actions{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    width:100%!important;
+    gap:10px!important;
+  }
+
+  .database-admin-actions .btn,
+  .database-heading-premium .database-admin-actions .btn,
+  .database-export-btn,
+  .database-bulk-btn{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    white-space:normal!important;
+    justify-content:center!important;
+    text-align:center!important;
+  }
+}
