@@ -11,11 +11,17 @@
     "android:doctor": "npx cap doctor"
   },
   "dependencies": {
+    "@capacitor/action-sheet": "8.1.1",
     "@capacitor/android": "8.5.0",
-    "@capacitor/core": "8.5.0"
+    "@capacitor/app": "8.1.1",
+    "@capacitor/camera": "8.2.2",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/filesystem": "8.1.2",
+    "@capacitor/share": "8.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "8.5.0"
+    "@capacitor/cli": "8.5.0",
+    "esbuild": "0.28.2"
   },
   "engines": {
     "node": ">=22.0.0"

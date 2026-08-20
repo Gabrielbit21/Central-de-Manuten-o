@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildSync } from 'esbuild';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const mobileDir = resolve(here, '..');
@@ -58,20 +59,45 @@ for (const file of mobileFiles) {
   cpSync(source, join(webDir, file));
 }
 
+const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
+if (!existsSync(nativeBridgeSource)) {
+  throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
+}
+
+buildSync({
+  entryPoints: [nativeBridgeSource],
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: ['chrome120'],
+  outfile: join(webDir, 'mobile-native.js'),
+  minify: false,
+  sourcemap: false,
+  logLevel: 'info',
+});
+
 /*
- * Injeta o CSS exclusivo do Android depois dos estilos existentes.
- * Assim a versão Windows/PWA continua usando os arquivos originais.
+ * Injeta recursos exclusivos do Android no bundle mobile.
+ * Windows e PWA continuam usando os arquivos originais da raiz.
  */
 const indexPath = join(webDir, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
+const mobileJsTag = '<script src="./mobile-native.js"></script>';
 
 if (!html.includes(mobileCssTag)) {
   if (!html.includes('</head>')) {
     throw new Error('Não foi possível localizar </head> no index.html');
   }
   html = html.replace('</head>', `${mobileCssTag}\n</head>`);
-  writeFileSync(indexPath, html, 'utf8');
 }
 
+if (!html.includes(mobileJsTag)) {
+  if (!html.includes('</body>')) {
+    throw new Error('Não foi possível localizar </body> no index.html');
+  }
+  html = html.replace('</body>', `${mobileJsTag}\n</body>`);
+}
+
+writeFileSync(indexPath, html, 'utf8');
 console.log(`Web bundle preparado em: ${webDir}`);
