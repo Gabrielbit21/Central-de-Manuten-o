@@ -76,6 +76,12 @@ buildSync({
   logLevel: 'info',
 });
 
+const nativeFixesSource = join(mobileDir, 'native', 'native-fixes.js');
+if (!existsSync(nativeFixesSource)) {
+  throw new Error(`Correções nativas não encontradas: ${nativeFixesSource}`);
+}
+cpSync(nativeFixesSource, join(webDir, 'mobile-native-fixes.js'));
+
 /*
  * Injeta recursos exclusivos do Android no bundle mobile.
  * Windows e PWA continuam usando os arquivos originais da raiz.
@@ -84,6 +90,7 @@ const indexPath = join(webDir, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 const mobileJsTag = '<script src="./mobile-native.js"></script>';
+const mobileFixesTag = '<script src="./mobile-native-fixes.js"></script>';
 
 if (!html.includes(mobileCssTag)) {
   if (!html.includes('</head>')) {
@@ -96,7 +103,9 @@ if (!html.includes(mobileJsTag)) {
   if (!html.includes('</body>')) {
     throw new Error('Não foi possível localizar </body> no index.html');
   }
-  html = html.replace('</body>', `${mobileJsTag}\n</body>`);
+  html = html.replace('</body>', `${mobileJsTag}\n${mobileFixesTag}\n</body>`);
+} else if (!html.includes(mobileFixesTag)) {
+  html = html.replace(mobileJsTag, `${mobileJsTag}\n${mobileFixesTag}`);
 }
 
 writeFileSync(indexPath, html, 'utf8');
