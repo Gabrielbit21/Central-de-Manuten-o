@@ -1,0 +1,20 @@
+{
+  "appId": "io.github.gabrielbit21.centralmanutencaose",
+  "appName": "Central de Manutenção SE",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#ffffff",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "LIGHT",
+      "hidden": false,
+      "animation": "NONE"
+    }
+  }
+}

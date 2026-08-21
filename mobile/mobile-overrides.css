@@ -1,0 +1,235 @@
+/*
+ * Ajustes exclusivos do Android Native — v3.
+ * Este arquivo é injetado somente no bundle mobile.
+ * Windows e PWA permanecem sem alterações.
+ */
+
+:root{
+  --mobile-safe-top:var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --mobile-safe-bottom:var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --mobile-safe-left:var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --mobile-safe-right:var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --mobile-header-height:60px;
+  --mobile-nav-height:62px;
+}
+
+html{
+  background:#fff;
+}
+
+body{
+  padding:0!important;
+}
+
+body::before{
+  content:"";
+  position:fixed;
+  z-index:80;
+  top:0;
+  left:0;
+  right:0;
+  height:var(--mobile-safe-top);
+  background:#fff;
+  pointer-events:none;
+}
+
+@media(max-width:760px){
+  #app-shell>.top-shell{
+    position:fixed!important;
+    z-index:70!important;
+    top:var(--mobile-safe-top)!important;
+    left:var(--mobile-safe-left)!important;
+    right:var(--mobile-safe-right)!important;
+    width:auto!important;
+    margin:0!important;
+    background:#fff!important;
+    border-bottom:1px solid var(--line)!important;
+    box-shadow:0 2px 10px rgba(25,58,75,.05);
+  }
+
+  #app-shell>.top-shell .topbar{
+    height:var(--mobile-header-height)!important;
+  }
+
+  #app-shell>main{
+    padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
+    padding-bottom:calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 22px)!important;
+  }
+
+  #app-shell>main:has(> .home-hero){
+    padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
+  }
+
+  .mobile-nav{
+    position:fixed!important;
+    z-index:75!important;
+    left:var(--mobile-safe-left)!important;
+    right:var(--mobile-safe-right)!important;
+    bottom:0!important;
+    min-height:calc(var(--mobile-nav-height) + var(--mobile-safe-bottom))!important;
+    padding-bottom:var(--mobile-safe-bottom)!important;
+    background:#fff!important;
+  }
+
+  .modal:not(#mobile-more-modal){
+    padding:
+      calc(var(--mobile-safe-top) + 12px)
+      12px
+      calc(var(--mobile-safe-bottom) + 12px)!important;
+    place-items:center!important;
+    justify-items:center!important;
+  }
+
+  .modal:not(#mobile-more-modal)>.modal-card,
+  .profile-settings-dialog,
+  .bulk-update-card,
+  .notification-center-card,
+  .data-export-dialog,
+  .report-modal-card{
+    box-sizing:border-box!important;
+    width:calc(100vw - 28px)!important;
+    max-width:min(680px, calc(100vw - 28px))!important;
+    max-height:calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 28px)!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    justify-self:center!important;
+    align-self:center!important;
+  }
+
+  .bulk-update-card,
+  .profile-settings-dialog,
+  .notification-center-card,
+  .data-export-dialog,
+  .report-modal-card{
+    overflow:auto!important;
+  }
+
+  #mobile-more-modal{
+    padding:
+      calc(var(--mobile-safe-top) + var(--mobile-header-height) + 10px)
+      12px
+      calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 10px)!important;
+    place-items:end center!important;
+  }
+
+  #mobile-more-modal>.mobile-more-sheet{
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:680px!important;
+    margin:0 auto!important;
+    border-radius:20px!important;
+    max-height:calc(
+      100dvh
+      - var(--mobile-safe-top)
+      - var(--mobile-header-height)
+      - var(--mobile-nav-height)
+      - var(--mobile-safe-bottom)
+      - 28px
+    )!important;
+    overflow:auto!important;
+  }
+}
+
+@media(max-width:560px){
+  .database-admin-actions,
+  .database-heading-premium .database-admin-actions{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    width:100%!important;
+    gap:10px!important;
+  }
+
+  .database-admin-actions .btn,
+  .database-heading-premium .database-admin-actions .btn,
+  .database-export-btn,
+  .database-bulk-btn{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    white-space:normal!important;
+    justify-content:center!important;
+    text-align:center!important;
+  }
+}
+
+/* ===== Android Native — fotos de ativo/perfil (correção consolidada) ===== */
+@media(max-width:760px){
+  .asset-profile-frame.has-photo .asset-profile-action{
+    opacity:1!important;
+    inset:auto 8px 8px 8px!important;
+    min-height:34px!important;
+    border-radius:9px!important;
+    background:rgba(0,86,110,.88)!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:7px 10px!important;
+  }
+
+  #asset-modal .asset-modal-photo.android-photo-editable{
+    position:relative!important;
+    overflow:hidden!important;
+  }
+
+  #asset-modal .android-asset-photo-action{
+    position:absolute!important;
+    top:auto!important;
+    left:12px!important;
+    right:12px!important;
+    bottom:12px!important;
+    z-index:4!important;
+    width:auto!important;
+    height:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+    border:0!important;
+    border-radius:12px!important;
+    padding:0 14px!important;
+    margin:0!important;
+    background:rgba(0,86,110,.92)!important;
+    color:#fff!important;
+    font-weight:800!important;
+    font-size:12px!important;
+    line-height:1!important;
+    display:flex!important;
+    flex:0 0 auto!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:8px!important;
+    box-shadow:0 5px 16px rgba(0,0,0,.15)!important;
+    overflow:hidden!important;
+  }
+
+  #asset-modal .android-asset-photo-action .ui-icon{
+    width:18px!important;
+    height:18px!important;
+    min-width:18px!important;
+    flex:0 0 18px!important;
+  }
+
+  /*
+   * A ficha original usa spans internos da área de foto como placeholder grande.
+   * O texto do botão Android herdava esse tamanho e explodia visualmente.
+   * Neutralizamos apenas o rótulo desse botão.
+   */
+  #asset-modal .android-asset-photo-action>span:not([data-icon]){
+    display:inline!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    font-size:12px!important;
+    line-height:1.2!important;
+    font-weight:800!important;
+    color:#fff!important;
+    opacity:1!important;
+    transform:none!important;
+  }
+
+  #my-profile-modal .profile-settings-dialog,
+  #profile-photo-modal .profile-photo-dialog{
+    transform:translateZ(0);
+    opacity:1!important;
+    visibility:visible!important;
+  }
+}

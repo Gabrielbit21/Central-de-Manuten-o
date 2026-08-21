@@ -1,0 +1,64 @@
+name: Validar Android Native
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'index.html'
+      - 'app.js'
+      - 'manifest.webmanifest'
+      - 'sw.js'
+      - 'version.json'
+      - 'assets/**'
+      - 'vendor/**'
+      - '.github/workflows/validar-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package.json
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Instalar dependências
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+
+      - name: Preparar arquivos web
+        working-directory: mobile
+        run: npm run web:prepare
+
+      - name: Criar projeto Android
+        working-directory: mobile
+        run: npx cap add android
+
+      - name: Compilar APK debug
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug
+
+      - name: Publicar APK de teste
+        uses: actions/upload-artifact@v4
+        with:
+          name: Central_Manutencao_SE_Android_Debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
