@@ -17,16 +17,10 @@ html{
   background:#fff;
 }
 
-/*
- * IMPORTANTE:
- * Não aplicar o safe-area no body. No ajuste anterior isso somava o inset
- * ao "top" do header sticky e gerava um espaço duplo acima do cabeçalho.
- */
 body{
   padding:0!important;
 }
 
-/* Faixa do sistema Android: fundo sólido atrás de relógio, rede e bateria. */
 body::before{
   content:"";
   position:fixed;
@@ -39,11 +33,6 @@ body::before{
   pointer-events:none;
 }
 
-/*
- * Experiência "app nativo":
- * cabeçalho e navegação inferior ficam fixos;
- * somente o conteúdo central rola.
- */
 @media(max-width:760px){
   #app-shell>.top-shell{
     position:fixed!important;
@@ -63,15 +52,10 @@ body::before{
   }
 
   #app-shell>main{
-    /*
-     * O header saiu do fluxo por ser fixed.
-     * Reservamos exatamente uma vez a status bar + altura do cabeçalho.
-     */
     padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
     padding-bottom:calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 22px)!important;
   }
 
-  /* Regras específicas que no CSS principal alteram o padding do home. */
   #app-shell>main:has(> .home-hero){
     padding-top:calc(var(--mobile-safe-top) + var(--mobile-header-height) + 15px)!important;
   }
@@ -87,10 +71,6 @@ body::before{
     background:#fff!important;
   }
 
-  /*
-   * Modais convencionais: cartão centralizado no viewport útil.
-   * Corrige telas que encostavam na borda direita em alguns Androids.
-   */
   .modal:not(#mobile-more-modal){
     padding:
       calc(var(--mobile-safe-top) + 12px)
@@ -116,7 +96,6 @@ body::before{
     align-self:center!important;
   }
 
-  /* Atualização em massa pode ser longa: mantém rolagem dentro do cartão. */
   .bulk-update-card,
   .profile-settings-dialog,
   .notification-center-card,
@@ -125,10 +104,6 @@ body::before{
     overflow:auto!important;
   }
 
-  /*
-   * "Mais opções" continua como bottom sheet, mas fica simétrico:
-   * pequena margem nas duas laterais e rodapé sempre visível.
-   */
   #mobile-more-modal{
     padding:
       calc(var(--mobile-safe-top) + var(--mobile-header-height) + 10px)
@@ -155,10 +130,6 @@ body::before{
   }
 }
 
-/*
- * Banco de Dados no celular:
- * ações em uma coluna para não disputar largura.
- */
 @media(max-width:560px){
   .database-admin-actions,
   .database-heading-premium .database-admin-actions{
@@ -183,7 +154,6 @@ body::before{
 
 /* ===== Android Native — fotos de ativo/perfil (correção consolidada) ===== */
 @media(max-width:760px){
-  /* Depois que existe uma foto, mantém uma ação explícita e tocável. */
   .asset-profile-frame.has-photo .asset-profile-action{
     opacity:1!important;
     inset:auto 8px 8px 8px!important;
@@ -196,37 +166,66 @@ body::before{
     padding:7px 10px!important;
   }
 
-  /* Foto da ficha do Banco de Dados ganha a mesma ação da manutenção. */
   #asset-modal .asset-modal-photo.android-photo-editable{
     position:relative!important;
     overflow:hidden!important;
   }
+
   #asset-modal .android-asset-photo-action{
     position:absolute!important;
-    left:8px!important;
-    right:8px!important;
-    bottom:8px!important;
+    top:auto!important;
+    left:12px!important;
+    right:12px!important;
+    bottom:12px!important;
     z-index:4!important;
-    min-height:38px!important;
+    width:auto!important;
+    height:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
     border:0!important;
-    border-radius:10px!important;
-    padding:8px 10px!important;
-    background:rgba(0,86,110,.90)!important;
+    border-radius:12px!important;
+    padding:0 14px!important;
+    margin:0!important;
+    background:rgba(0,86,110,.92)!important;
     color:#fff!important;
-    font-weight:850!important;
-    font-size:11px!important;
+    font-weight:800!important;
+    font-size:12px!important;
+    line-height:1!important;
     display:flex!important;
+    flex:0 0 auto!important;
     align-items:center!important;
     justify-content:center!important;
-    gap:7px!important;
+    gap:8px!important;
     box-shadow:0 5px 16px rgba(0,0,0,.15)!important;
+    overflow:hidden!important;
   }
+
   #asset-modal .android-asset-photo-action .ui-icon{
     width:18px!important;
     height:18px!important;
+    min-width:18px!important;
+    flex:0 0 18px!important;
   }
 
-  /* O modal de perfil deve ser perceptível imediatamente ao toque. */
+  /*
+   * A ficha original usa spans internos da área de foto como placeholder grande.
+   * O texto do botão Android herdava esse tamanho e explodia visualmente.
+   * Neutralizamos apenas o rótulo desse botão.
+   */
+  #asset-modal .android-asset-photo-action>span:not([data-icon]){
+    display:inline!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    font-size:12px!important;
+    line-height:1.2!important;
+    font-weight:800!important;
+    color:#fff!important;
+    opacity:1!important;
+    transform:none!important;
+  }
+
   #my-profile-modal .profile-settings-dialog,
   #profile-photo-modal .profile-photo-dialog{
     transform:translateZ(0);
