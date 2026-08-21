@@ -1,4 +1,4 @@
-const SW_VERSION = '1.9.0';
+const SW_VERSION = '1.9.0-media-v3';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -41,8 +41,14 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navegação e version.json usam network-first para receber atualizações rapidamente.
-  if (request.mode === 'navigate' || url.pathname.endsWith('/version.json')) {
+  // Navegação e código funcional crítico usam network-first.
+  // Assim uma atualização de app.js/media-core não fica presa ao shell antigo.
+  const criticalCode = [
+    '/app.js',
+    '/assets/js/media-core.js',
+    '/assets/css/media-core.css',
+  ].some(path => url.pathname.endsWith(path));
+  if (request.mode === 'navigate' || url.pathname.endsWith('/version.json') || criticalCode) {
     event.respondWith((async () => {
       try {
         const response = await fetch(request);

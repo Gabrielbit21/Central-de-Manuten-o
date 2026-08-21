@@ -1,4 +1,4 @@
-/* CENTRAL_MEDIA_CORE_V2
+/* CENTRAL_MEDIA_CORE_V3
  * Camada única de mídia da Central de Manutenção SE.
  *
  * Princípios:
@@ -12,8 +12,8 @@
 (() => {
   'use strict';
 
-  if (globalThis.__CENTRAL_MEDIA_CORE_V2__) return;
-  globalThis.__CENTRAL_MEDIA_CORE_V2__ = true;
+  if (globalThis.__CENTRAL_MEDIA_CORE_V3__) return;
+  globalThis.__CENTRAL_MEDIA_CORE_V3__ = true;
 
   const ASSET_QUEUE_KIND = 'asset-profile-sync-v2';
   const AVATAR_QUEUE_KIND = 'user-avatar-sync-v2';
@@ -44,7 +44,7 @@
     wrapped.centralMediaStage = stage;
     wrapped.cause = original;
     diagnostic(stage, 'error', { message: original.message || String(original), context });
-    console.error('[Media V2]', stage, context, original);
+    console.error('[Media V3]', stage, context, original);
     return wrapped;
   }
 
@@ -241,7 +241,7 @@
     const entry = await queueAssetProfile(assetId, blob);
     if (entry && navigator.onLine && state.cloudUser?.id) {
       try { await syncAssetEntry(entry); }
-      catch (error) { console.warn('[Media V2] Foto local válida; sincronização ficou pendente.', error); }
+      catch (error) { console.warn('[Media V3] Foto local válida; sincronização ficou pendente.', error); }
     }
     return blob;
   }
@@ -258,7 +258,7 @@
     let processed = 0;
     for (const entry of await pendingEntries(ASSET_QUEUE_KIND)) {
       try { if (await syncAssetEntry(entry)) processed += 1; }
-      catch (error) { console.warn('[Media V2] Foto de ativo pendente:', error); }
+      catch (error) { console.warn('[Media V3] Foto de ativo pendente:', error); }
     }
     return processed;
   }
@@ -271,7 +271,7 @@
         await validateImageBlob(local.blob);
         return local.blob;
       } catch (error) {
-        console.warn('[Media V2] Cache local inválido removido do ativo:', assetId, error);
+        console.warn('[Media V3] Cache local inválido removido do ativo:', assetId, error);
         diagnostic('repair-asset-cache', 'removed', { assetId, message: String(error?.message || error) });
         await idbDelete('assetPhotos', assetId).catch(() => {});
       }
@@ -309,7 +309,7 @@
       if (entry.action === 'remove') {
         if (entry.oldPath) {
           const { error } = await cloudClient.storage.from('user-profile-photos').remove([entry.oldPath]);
-          if (error) console.warn('[Media V2] Remoção do avatar anterior:', error);
+          if (error) console.warn('[Media V3] Remoção do avatar anterior:', error);
         }
         const { error } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: null });
         if (error) throw error;
@@ -347,7 +347,7 @@
     const entry = await queueAvatar(blob, 'set');
     if (entry && navigator.onLine) {
       try { await syncAvatarEntry(entry); }
-      catch (error) { console.warn('[Media V2] Avatar local válido; sincronização pendente.', error); }
+      catch (error) { console.warn('[Media V3] Avatar local válido; sincronização pendente.', error); }
     }
     updateRoleChrome();
     return blob;
@@ -362,7 +362,7 @@
     const entry = await queueAvatar(null, 'remove', oldPath);
     if (entry && navigator.onLine) {
       try { await syncAvatarEntry(entry); }
-      catch (error) { console.warn('[Media V2] Remoção do avatar pendente.', error); }
+      catch (error) { console.warn('[Media V3] Remoção do avatar pendente.', error); }
     }
     updateRoleChrome();
   }
@@ -372,7 +372,7 @@
     let processed = 0;
     for (const entry of await pendingEntries(AVATAR_QUEUE_KIND)) {
       try { if (await syncAvatarEntry(entry)) processed += 1; }
-      catch (error) { console.warn('[Media V2] Avatar pendente:', error); }
+      catch (error) { console.warn('[Media V3] Avatar pendente:', error); }
     }
     return processed;
   }
@@ -441,7 +441,7 @@
     finally { (state.pendingPhotos || []).forEach((photo, i) => { photo.asProfile = originalFlags[i] || false; }); }
     for (const item of selected) {
       try { await saveAssetProfilePhoto(item.assetId, item.photo.blob); }
-      catch (error) { console.warn('[Media V2] Promoção de foto da manutenção:', error); }
+      catch (error) { console.warn('[Media V3] Promoção de foto da manutenção:', error); }
     }
     return result;
   };
@@ -510,7 +510,7 @@
       attachAssetAction(subId, assetId);
       return result;
     } catch (error) {
-      console.error('[Media V2] Abertura de ativo:', assetId, error);
+      console.error('[Media V3] Abertura de ativo:', assetId, error);
       throw error;
     }
   };
@@ -666,16 +666,73 @@
     } catch (error) { showMediaError(error); }
   });
 
+  let nativeSpreadsheetExportInstalled = false;
+
+  function installNativeSpreadsheetExport() {
+    if (nativeSpreadsheetExportInstalled) return true;
+    const native = globalThis.CentralNativeAndroid;
+    const xlsx = globalThis.XLSX;
+    if (!native?.isAvailable?.() || typeof native.shareFile !== 'function') return false;
+    if (!xlsx || typeof xlsx.write !== 'function' || typeof xlsx.writeFile !== 'function') return false;
+
+    const originalWriteFile = xlsx.writeFile.bind(xlsx);
+    try {
+      xlsx.writeFile = function writeFileNativeAndroid(workbook, filename, options = {}) {
+        try {
+          const output = xlsx.write(workbook, {
+            ...options,
+            type: 'array',
+            bookType: options.bookType || 'xlsx',
+          });
+          const blob = new Blob([output], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          });
+          diagnostic('export-xlsx-native', 'start', {
+            filename: String(filename || 'exportacao.xlsx'),
+            bytes: blob.size,
+          });
+          Promise.resolve(native.shareFile(blob, String(filename || 'exportacao.xlsx')))
+            .then(() => diagnostic('export-xlsx-native', 'ok', {
+              filename: String(filename || 'exportacao.xlsx'),
+              bytes: blob.size,
+            }))
+            .catch(error => {
+              diagnostic('export-xlsx-native', 'error', {
+                filename: String(filename || 'exportacao.xlsx'),
+                message: String(error?.message || error),
+              });
+              toast(`[export-native] ${error?.message || String(error)}`, 'warning');
+            });
+          return true;
+        } catch (error) {
+          diagnostic('export-xlsx-build', 'error', {
+            filename: String(filename || 'exportacao.xlsx'),
+            message: String(error?.message || error),
+          });
+          toast(`[export-build] ${error?.message || String(error)}`, 'warning');
+          return false;
+        }
+      };
+      nativeSpreadsheetExportInstalled = xlsx.writeFile !== originalWriteFile;
+      return nativeSpreadsheetExportInstalled;
+    } catch (error) {
+      console.warn('[Media V3] Não foi possível instalar exportação XLSX nativa:', error);
+      return false;
+    }
+  }
+
   globalThis.CentralMedia = Object.freeze({
-    version: '2.0.0',
+    version: '3.0.0',
     pickImages,
     pickImage,
     saveAssetProfilePhoto,
     saveAvatar,
     syncPending,
+    installNativeSpreadsheetExport,
     getDiagnostics: () => diagnostics.slice(),
   });
 
+  installNativeSpreadsheetExport();
   mediaCss();
   installDesktopProfileOpener();
   if (state.cloudUser?.id && navigator.onLine) setTimeout(() => syncPending().catch(() => {}), 1000);

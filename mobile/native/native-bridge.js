@@ -4,7 +4,7 @@ import { Camera, MediaTypeSelection } from '@capacitor/camera';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-/* CENTRAL_NATIVE_BRIDGE_MEDIA_V3
+/* CENTRAL_NATIVE_BRIDGE_MEDIA_V4
  * Bridge Android sem interceptação global de input[type=file].
  * A UI chama CentralNativeAndroid explicitamente via media-core.js.
  */
@@ -13,15 +13,47 @@ const isAndroidNative = () =>
   window.Capacitor?.isNativePlatform?.() === true &&
   window.Capacitor?.getPlatform?.() === 'android';
 
-const PENDING_CAMERA_KEY = 'central_mobile_pending_camera_v3';
+const PENDING_CAMERA_KEY = 'central_mobile_pending_camera_v4';
 const MAX_NATIVE_FILE_BYTES = 24 * 1024 * 1024;
 let activePickerPromise = null;
 
+let runtimeCleanupPromise = Promise.resolve();
+
 if (isAndroidNative()) {
+  // Marcador síncrono: o app.js gerado para Android não registra Service Worker.
+  // Isso evita que um APK novo continue executando JS antigo preservado pelo WebView.
+  window.__CENTRAL_ANDROID_NATIVE__ = true;
+  runtimeCleanupPromise = cleanupNativeWebRuntime();
   exposeNativeApi();
   installAndroidBackButton();
   installNativeFileSharing();
   installRestoredCameraHandler();
+}
+
+async function cleanupNativeWebRuntime() {
+  // IndexedDB/localStorage NÃO são limpos: registros, rascunhos e sessão continuam preservados.
+  // Removemos somente Service Workers e Cache Storage do shell web.
+  try {
+    if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistrations === 'function') {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.unregister().catch(() => false)));
+    }
+  } catch (error) {
+    console.warn('[Native Runtime V4] Falha ao remover Service Worker legado:', error);
+  }
+
+  try {
+    if ('caches' in window && typeof caches.keys === 'function') {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter(key => key.startsWith('central-static-'))
+          .map(key => caches.delete(key).catch(() => false)),
+      );
+    }
+  } catch (error) {
+    console.warn('[Native Runtime V4] Falha ao limpar cache legado:', error);
+  }
 }
 
 function isVisible(element) {
@@ -190,10 +222,12 @@ async function pickImages(options = {}) {
 
 function exposeNativeApi() {
   window.CentralNativeAndroid = Object.freeze({
-    version: '3.0.0',
+    version: '4.0.0',
     isAvailable: () => true,
+    runtimeReady: () => runtimeCleanupPromise,
     pickImages: (options = {}) => pickImages(options),
     pickImage: async (options = {}) => (await pickImages({ ...options, multiple: false }))[0] || null,
+    shareFile: (blob, filename) => shareBlob(blob, filename),
   });
 }
 

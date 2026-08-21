@@ -9,6 +9,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
+import { createHash } from 'node:crypto';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const mobileDir = resolve(here, '..');
@@ -55,20 +56,51 @@ if (!existsSync(mediaCoreSource)) {
   throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
 }
 const mediaCoreText = readFileSync(mediaCoreSource, 'utf8');
-if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V2')) {
-  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V2.');
+if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V3')) {
+  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V3.');
 }
 new Function(mediaCoreText);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
 const nativeBridgeText = readFileSync(nativeBridgeSource, 'utf8');
-if (!nativeBridgeText.includes('CENTRAL_NATIVE_BRIDGE_MEDIA_V3')) {
-  throw new Error('native-bridge.js não contém a assinatura CENTRAL_NATIVE_BRIDGE_MEDIA_V3.');
+if (!nativeBridgeText.includes('CENTRAL_NATIVE_BRIDGE_MEDIA_V4')) {
+  throw new Error('native-bridge.js não contém a assinatura CENTRAL_NATIVE_BRIDGE_MEDIA_V4.');
 }
 if (nativeBridgeText.includes('installNativeImageInputBridge')) {
   throw new Error('native-bridge.js ainda contém interceptação global de input de imagem.');
 }
+
+// O APK não deve registrar Service Worker: os assets já são embarcados localmente.
+// Mantemos SW apenas em PWA; no Android ele causava cache persistente entre APKs.
+const appPath = join(webDir, 'app.js');
+let appText = readFileSync(appPath, 'utf8');
+const swFunctionMarker = 'async function registerCentralServiceWorker(){';
+if (!appText.includes(swFunctionMarker)) {
+  throw new Error('app.js não contém registerCentralServiceWorker.');
+}
+appText = appText.replace(
+  swFunctionMarker,
+  `${swFunctionMarker}\n  if(globalThis.__CENTRAL_ANDROID_NATIVE__===true)return null;`,
+);
+writeFileSync(appPath, appText, 'utf8');
+
+// Token de conteúdo: cada mudança funcional gera nomes novos dentro do APK.
+// Mesmo que um WebView antigo ainda esteja temporariamente sob controle de um
+// Service Worker legado, os novos nomes não existem no cache antigo.
+const buildToken = createHash('sha256')
+  .update(appText)
+  .update(mediaCoreText)
+  .update(nativeBridgeText)
+  .digest('hex')
+  .slice(0, 12);
+
+const nativeAppName = `app-native-${buildToken}.js`;
+const nativeMediaName = `media-core-native-${buildToken}.js`;
+const nativeBundleName = `mobile-native-${buildToken}.js`;
+
+writeFileSync(join(webDir, nativeAppName), appText, 'utf8');
+writeFileSync(join(webDir, 'assets', 'js', nativeMediaName), mediaCoreText, 'utf8');
 
 buildSync({
   entryPoints: [nativeBridgeSource],
@@ -76,7 +108,7 @@ buildSync({
   platform: 'browser',
   format: 'iife',
   target: ['chrome120'],
-  outfile: join(webDir, 'mobile-native.js'),
+  outfile: join(webDir, nativeBundleName),
   minify: false,
   sourcemap: false,
   logLevel: 'info',
@@ -84,25 +116,37 @@ buildSync({
 
 const indexPath = join(webDir, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
+const appTag = '<script src="./app.js"></script>';
 const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
-const mobileJsTag = '<script src="./mobile-native.js"></script>';
 
-if (!html.includes(mediaCoreTag)) {
-  const appTag = '<script src="./app.js"></script>';
-  if (!html.includes(appTag)) throw new Error('index.html não contém a referência esperada a app.js');
-  html = html.replace(appTag, `${appTag}\n${mediaCoreTag}`);
-}
+// Remove scripts genéricos: no Android usamos nomes content-addressed.
+html = html
+  .replace(appTag, '')
+  .replace(mediaCoreTag, '')
+  .replace('<script src="./mobile-native.js"></script>', '');
 
 if (!html.includes(mobileCssTag)) {
   if (!html.includes('</head>')) throw new Error('Não foi possível localizar </head> no index.html');
   html = html.replace('</head>', `${mobileCssTag}\n</head>`);
 }
 
-if (!html.includes(mobileJsTag)) {
-  if (!html.includes('</body>')) throw new Error('Não foi possível localizar </body> no index.html');
-  html = html.replace('</body>', `${mobileJsTag}\n</body>`);
-}
+const nativeScripts = [
+  `<script src="./${nativeBundleName}"></script>`,
+  `<script src="./${nativeAppName}"></script>`,
+  `<script src="./assets/js/${nativeMediaName}"></script>`,
+].join('\n');
+
+if (!html.includes('</body>')) throw new Error('Não foi possível localizar </body> no index.html');
+html = html.replace('</body>', `${nativeScripts}\n</body>`);
 
 writeFileSync(indexPath, html, 'utf8');
-console.log(`Web bundle preparado em: ${webDir}`);
+writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
+  token: buildToken,
+  mediaCore: '3.0.0',
+  nativeBridge: '4.0.0',
+  serviceWorker: 'disabled-in-native',
+}, null, 2), 'utf8');
+
+console.log(`Web bundle Android preparado em: ${webDir}`);
+console.log(`Android content token: ${buildToken}`);
