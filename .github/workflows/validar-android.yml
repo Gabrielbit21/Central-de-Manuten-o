@@ -13,6 +13,7 @@ on:
       - 'assets/**'
       - 'vendor/**'
       - '.github/workflows/validar-android.yml'
+      - '.github/workflows/publicar-android.yml'
 
 permissions:
   contents: read
@@ -51,9 +52,19 @@ jobs:
         working-directory: mobile
         run: npx cap add android
 
+      - name: Aplicar versão e identidade visual
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node scripts/configure-android.mjs
+          java -Djava.awt.headless=true \
+            scripts/GenerateAndroidIcons.java \
+            ../assets/icons/app-icon-source.png \
+            android/app/src/main/res
+
       - name: Compilar APK debug
         working-directory: mobile/android
-        run: ./gradlew assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Publicar APK de teste
         uses: actions/upload-artifact@v4
