@@ -6,6 +6,8 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './version.json',
   './app.js',
+  './assets/js/media-core.js',
+  './assets/css/media-core.css',
   './vendor/supabase-js-2.57.4.min.js',
   './vendor/xlsx-0.20.3.full.min.js',
   './assets/icons/icon-64.png',

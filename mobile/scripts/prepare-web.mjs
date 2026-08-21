@@ -48,22 +48,19 @@ for (const file of mobileFiles) {
 }
 
 /*
- * O patch é CONCATENADO ao app.js copiado para www.
- * Isso é intencional: ele passa a executar no mesmo escopo da aplicação,
- * podendo corrigir os fluxos móveis sem alterar o app.js da raiz/Windows/PWA.
+ * A lógica de mídia agora é compartilhada por PWA, Windows e Android.
+ * O Android não concatena mais android-app-patch.js ao app.js.
  */
-const appPatchSource = join(mobileDir, 'native', 'android-app-patch.js');
-if (!existsSync(appPatchSource)) throw new Error(`Patch Android não encontrado: ${appPatchSource}`);
-const appPath = join(webDir, 'app.js');
-let appText = readFileSync(appPath, 'utf8');
-const appPatchText = readFileSync(appPatchSource, 'utf8');
-if (!appPatchText.includes('ANDROID_NATIVE_APP_PATCH_V2')) {
-  throw new Error('O patch Android não contém a assinatura esperada.');
+const mediaCoreSource = join(repoRoot, 'assets', 'js', 'media-core.js');
+if (!existsSync(mediaCoreSource)) {
+  throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
 }
-if (!appText.includes('ANDROID_NATIVE_APP_PATCH_V2')) {
-  appText += `\n\n${appPatchText}\n`;
-  writeFileSync(appPath, appText, 'utf8');
+const mediaCoreText = readFileSync(mediaCoreSource, 'utf8');
+if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V1')) {
+  throw new Error('media-core.js não contém a assinatura esperada.');
 }
+// Validação sintática no próprio workflow Android.
+new Function(mediaCoreText);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
@@ -80,11 +77,19 @@ buildSync({
   logLevel: 'info',
 });
 
-/* Injeta somente CSS e bridge nativa. O antigo native-fixes.js não é usado. */
 const indexPath = join(webDir, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
+const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 const mobileJsTag = '<script src="./mobile-native.js"></script>';
+
+// Segurança adicional: se a referência compartilhada ainda não tiver sido
+// incluída no index raiz, o APK continua recebendo a camada de mídia.
+if (!html.includes(mediaCoreTag)) {
+  const appTag = '<script src="./app.js"></script>';
+  if (!html.includes(appTag)) throw new Error('index.html não contém a referência esperada a app.js');
+  html = html.replace(appTag, `${appTag}\n${mediaCoreTag}`);
+}
 
 if (!html.includes(mobileCssTag)) {
   if (!html.includes('</head>')) throw new Error('Não foi possível localizar </head> no index.html');
