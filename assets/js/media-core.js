@@ -1,4 +1,5 @@
 /* CENTRAL_MEDIA_CORE_V1
+ * HOTFIX_ANDROID_PICKER_V1 — preserva o caminho nativo já validado e mantém a fila compartilhada.
  * Camada compartilhada de mídia da Central de Manutenção SE.
  * Carregada depois de app.js em PWA, Windows Native e Android Native.
  *
@@ -101,6 +102,13 @@
   }
 
   async function pickImage(options = {}) {
+    // No Android usamos exatamente o método unitário que já estava validado
+    // antes da unificação. Isso evita atravessar duas camadas de seleção para
+    // uma única foto e mantém câmera/galeria isoladas da persistência.
+    const native = globalThis.CentralNativeAndroid;
+    if (native?.isAvailable?.() && typeof native.pickImage === 'function') {
+      return native.pickImage({ ...options, multiple: false });
+    }
     const files = await pickImages({ ...options, multiple: false });
     return files[0] || null;
   }
@@ -184,30 +192,39 @@
     }
   }
 
-  async function saveAssetProfileBlob(assetId, sourceBlob) {
-    if (!assetId || !sourceBlob) return null;
-    const blob = await compressImage(sourceBlob, 1000, .82);
-    await idbPut('assetPhotos', {
-      assetId,
-      blob,
-      updatedAt: new Date().toISOString(),
-    });
+  // Mantemos como base a rotina que já estava validada no desktop/PWA e no
+  // Android anterior. A camada compartilhada acrescenta apenas a fila offline.
+  const baseSetAssetPhoto = setAssetPhoto;
+  setAssetPhoto = async function sharedSetAssetPhoto(assetId, file) {
+    if (!assetId || !file) return null;
+
+    let blob = null;
+    let cloudError = null;
+    try {
+      blob = await baseSetAssetPhoto(assetId, file);
+    } catch (error) {
+      // A implementação base grava localmente antes do upload. Se a nuvem
+      // falhar, preservamos a foto local e colocamos somente a sincronização
+      // na fila, em vez de repetir toda a cadeia de mídia nesta mesma chamada.
+      cloudError = error;
+      blob = (await idbGet('assetPhotos', assetId).catch(() => null))?.blob || null;
+      if (!blob) throw error;
+    }
 
     const entry = await queueAssetProfilePhoto(assetId, blob);
-    if (entry && navigator.onLine && state.cloudUser?.id) {
-      try {
-        await syncAssetProfileEntry(entry);
-      } catch (error) {
-        console.warn('[Media] Foto principal salva localmente; sincronização pendente:', error);
-      }
+    if (entry && navigator.onLine && state.cloudUser?.id && !cloudError) {
+      // A rotina base já concluiu Storage + RPC; não fazemos um segundo upload.
+      await idbDelete('appSettings', entry.key).catch(() => {});
+    }
+    if (cloudError) {
+      console.warn('[Media] Foto principal salva localmente; sincronização pendente:', cloudError);
     }
     return blob;
-  }
-
-  // Substitui a implementação antiga: sempre local-first e com fila offline.
-  setAssetPhoto = async function sharedSetAssetPhoto(assetId, file) {
-    return saveAssetProfileBlob(assetId, file);
   };
+
+  async function saveAssetProfileBlob(assetId, sourceBlob) {
+    return setAssetPhoto(assetId, sourceBlob);
+  }
 
   async function pendingEntries(kind) {
     const ownerId = currentOwnerId();
@@ -329,32 +346,56 @@
     state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: path };
     storeIdentity(state.cloudUser, state.cloudProfile);
 
-    const entry = await queueUserAvatar(blob, 'set');
-    if (entry && navigator.onLine) {
+    let synced = false;
+    if (navigator.onLine) {
       try {
-        await syncUserAvatarEntry(entry);
+        const { error: uploadError } = await cloudClient.storage
+          .from('user-profile-photos')
+          .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) throw uploadError;
+        const { error: rpcError } = await cloudClient.rpc('set_own_profile_avatar', {
+          p_storage_path: path,
+        });
+        if (rpcError) throw rpcError;
+        synced = true;
+        await idbDelete('appSettings', avatarQueueKey(state.cloudUser.id)).catch(() => {});
       } catch (error) {
         console.warn('[Media] Avatar salvo localmente; sincronização pendente:', error);
       }
     }
+    if (!synced) await queueUserAvatar(blob, 'set');
+
     updateRoleChrome();
     return blob;
   }
 
   async function removeUserAvatarShared() {
     if (!state.cloudUser?.id) throw new Error('Sessão do usuário indisponível. Entre novamente.');
+    const ownerId = state.cloudUser.id;
     const oldPath = state.cloudProfile?.avatar_path || null;
-    await idbDelete('appSettings', `user-avatar:${state.cloudUser.id}`);
+    await idbDelete('appSettings', `user-avatar:${ownerId}`);
     state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: null };
     storeIdentity(state.cloudUser, state.cloudProfile);
-    const entry = await queueUserAvatar(null, 'remove', oldPath);
-    if (entry && navigator.onLine) {
+
+    let synced = false;
+    if (navigator.onLine) {
       try {
-        await syncUserAvatarEntry(entry);
+        if (oldPath) {
+          const { error: removeError } = await cloudClient.storage
+            .from('user-profile-photos')
+            .remove([oldPath]);
+          if (removeError) console.warn('[Media] Remoção do arquivo antigo do avatar:', removeError);
+        }
+        const { error } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: null });
+        if (error) throw error;
+        synced = true;
+        await idbDelete('appSettings', avatarQueueKey(ownerId)).catch(() => {});
       } catch (error) {
         console.warn('[Media] Remoção do avatar pendente de sincronização:', error);
       }
     }
+    if (!synced) await queueUserAvatar(null, 'remove', oldPath);
+
     updateRoleChrome();
     return true;
   }
@@ -617,6 +658,24 @@
 
   openProfilePhotoDialog = openSharedProfilePhotoDialog;
   openMyProfileDialog = openSharedMyProfileDialog;
+
+  // O botão principal de imagens passa pela mesma API compartilhada em todas
+  // as plataformas. No Android isso evita depender do clique programático no
+  // input escondido; no Windows/PWA o seletor continua sendo o do sistema.
+  document.addEventListener('click', event => {
+    const button = event.target instanceof Element
+      ? event.target.closest('#pick-photos')
+      : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    pickImages({ multiple: true, title: 'Adicionar fotos' })
+      .then(files => files?.length ? addPendingPhotos(files) : null)
+      .catch(error => {
+        const message = String(error?.message || error);
+        if (!/cancel|cancelado|canceled/i.test(message)) toast(message, 'warning');
+      });
+  }, true);
 
   // Garante o novo opener mesmo se algum listener antigo tiver capturado a função anterior.
   document.addEventListener('click', event => {
