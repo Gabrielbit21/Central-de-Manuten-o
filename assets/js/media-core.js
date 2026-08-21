@@ -1,4 +1,5 @@
 /* CENTRAL_MEDIA_CORE_V4
+ * FINAL_UX_V4_1 — acabamento: ícones únicos + remoção de foto do ativo.
  * Camada única de mídia da Central de Manutenção SE.
  *
  * Princípios:
@@ -191,13 +192,15 @@
   function assetQueueKey(uid, assetId) { return `${ASSET_QUEUE_PREFIX}${uid}:${assetId}`; }
   function avatarQueueKey(uid) { return `${AVATAR_QUEUE_PREFIX}${uid}`; }
 
-  async function queueAssetProfile(assetId, blob) {
+  async function queueAssetProfile(assetId, blob, action = 'set', oldPath = null) {
     const uid = ownerId();
-    if (!uid || !assetId || !blob) return null;
+    if (!uid || !assetId || (action === 'set' && !blob)) return null;
     const key = assetQueueKey(uid, assetId);
     const previous = await idbGet('appSettings', key).catch(() => null);
     const entry = {
-      key, kind: ASSET_QUEUE_KIND, ownerId: uid, assetId, blob,
+      key, kind: ASSET_QUEUE_KIND, ownerId: uid, assetId, action,
+      blob: action === 'set' ? blob : null,
+      oldPath: oldPath || previous?.oldPath || null,
       status: 'pendente', attempts: previous?.attempts || 0, lastError: '',
       createdAt: previous?.createdAt || nowIso(), updatedAt: nowIso(),
     };
@@ -236,11 +239,40 @@
     entry.attempts = (entry.attempts || 0) + 1;
     entry.updatedAt = nowIso();
     await idbPut('appSettings', entry);
-    const path = `${state.cloudUser.id}/${entry.assetId}/profile.jpg`;
+
     try {
+      if (entry.action === 'remove') {
+        // O vínculo no banco é a fonte de verdade. Limpamos primeiro o RPC;
+        // a exclusão física do objeto é uma limpeza secundária e não impede
+        // que o ativo fique imediatamente sem foto.
+        await stage('cloud-asset-remove-rpc', async () => {
+          const { error } = await cloudClient.rpc('set_asset_profile_photo', {
+            p_asset_id: entry.assetId,
+            p_storage_path: null,
+          });
+          if (error) throw error;
+        }, { assetId: entry.assetId });
+
+        updateAssetPath(entry.assetId, null);
+        await idbDelete('assetPhotos', entry.assetId).catch(() => {});
+
+        if (entry.oldPath) {
+          try {
+            const { error } = await cloudClient.storage.from('asset-profile-photos').remove([entry.oldPath]);
+            if (error) console.warn('[Media V4.1] Foto antiga do ativo não pôde ser excluída do Storage:', error);
+          } catch (error) {
+            console.warn('[Media V4.1] Limpeza do objeto antigo do ativo:', error);
+          }
+        }
+
+        await idbDelete('appSettings', entry.key);
+        return true;
+      }
+
+      const path = `${state.cloudUser.id}/${entry.assetId}/profile.jpg`;
       await stage('cloud-asset-upload', async () => {
         const { error } = await cloudClient.storage.from('asset-profile-photos')
-          .upload(path, entry.blob, { contentType: 'image/jpeg', upsert: true });
+          .upload(path, entry.blob, { contentType: entry.blob?.type || 'image/jpeg', upsert: true });
         if (error) throw error;
       }, { assetId: entry.assetId });
       await stage('cloud-asset-rpc', async () => {
@@ -279,6 +311,26 @@
     return blob;
   }
 
+  async function removeAssetProfilePhoto(assetId) {
+    if (!assetId) return false;
+    await androidAssetCacheRepairPromise;
+    const asset = findAssetAnywhere(assetId);
+    const oldPath = asset?.profilePhotoPath || null;
+
+    // Remoção local imediata: o usuário vê o ativo sem foto mesmo offline.
+    await stage('local-asset-remove', () => idbDelete('assetPhotos', assetId), { assetId });
+    updateAssetPath(assetId, null);
+
+    const entry = await queueAssetProfile(assetId, null, 'remove', oldPath);
+    if (entry && navigator.onLine && state.cloudUser?.id) {
+      try { await syncAssetEntry(entry); }
+      catch (error) {
+        console.warn('[Media V4.1] Remoção local concluída; sincronização ficou pendente.', error);
+      }
+    }
+    return true;
+  }
+
   async function pendingEntries(kind) {
     const uid = ownerId();
     if (!uid) return [];
@@ -310,7 +362,7 @@
     const uid = ownerId();
     if (!uid) return null;
     const entry = await idbGet('appSettings', assetQueueKey(uid, assetId)).catch(() => null);
-    if (!entry?.blob) return null;
+    if (!entry?.blob || entry.action === 'remove') return null;
     try { await validateImageBlob(entry.blob); return entry.blob; }
     catch { return null; }
   }
@@ -564,6 +616,38 @@
         afterSave: async () => { if (state.screen === 'activity') await renderActivity(); },
       });
     });
+    document.querySelectorAll('[data-asset-photo-frame]').forEach(frame => {
+      const assetId = frame.dataset.assetPhotoFrame;
+      const hasPhoto = Boolean(frame.querySelector('img'));
+      let removeButton = frame.querySelector('[data-remove-asset-profile]');
+      if (!hasPhoto) { removeButton?.remove(); return; }
+      if (!removeButton) {
+        removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'central-media-inline-remove';
+        removeButton.dataset.removeAssetProfile = assetId;
+        removeButton.innerHTML = '<span data-icon="trash"></span><span>Remover</span>';
+        frame.appendChild(removeButton);
+        hydrateIcons(removeButton);
+      }
+      removeButton.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!confirm('Remover a foto principal deste ativo?')) return;
+        removeButton.disabled = true;
+        try {
+          await removeAssetProfilePhoto(assetId);
+          toast(navigator.onLine
+            ? 'Foto do ativo removida.'
+            : 'Foto removida no dispositivo e aguardando sincronização.',
+            navigator.onLine ? 'success' : 'notice');
+          if (state.screen === 'activity') await renderActivity();
+        } catch (error) {
+          removeButton.disabled = false;
+          showMediaError(error);
+        }
+      };
+    });
     const button = document.getElementById('pick-photos');
     if (button) {
       button.onclick = async event => {
@@ -591,27 +675,64 @@
     if (state.role !== 'admin') return;
     const modal = document.getElementById('asset-modal');
     const photoHost = modal?.querySelector('.asset-modal-photo');
-    if (!photoHost || photoHost.querySelector('.central-media-asset-action')) return;
+    if (!photoHost || photoHost.querySelector('.central-media-asset-actions')) return;
     photoHost.classList.add('central-media-photo-host');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'central-media-asset-action';
-    button.innerHTML = '<span data-icon="camera"></span><span>Adicionar / alterar foto</span>';
-    photoHost.appendChild(button);
-    hydrateIcons(button);
-    button.onclick = async event => {
+
+    const actions = document.createElement('div');
+    actions.className = 'central-media-asset-actions';
+
+    const changeButton = document.createElement('button');
+    changeButton.type = 'button';
+    changeButton.className = 'central-media-asset-action';
+    changeButton.innerHTML = '<span data-icon="camera"></span><span>Adicionar / alterar foto</span>';
+    actions.appendChild(changeButton);
+
+    const hasPhoto = Boolean(photoHost.querySelector('img')) || Boolean(findAssetAnywhere(assetId)?.profilePhotoPath);
+    let removeButton = null;
+    if (hasPhoto) {
+      removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'central-media-asset-remove-action';
+      removeButton.innerHTML = '<span data-icon="trash"></span><span>Remover foto</span>';
+      actions.appendChild(removeButton);
+    }
+
+    photoHost.appendChild(actions);
+    hydrateIcons(actions);
+
+    changeButton.onclick = async event => {
       event.preventDefault();
       event.stopPropagation();
       await chooseAssetProfilePhoto(assetId, {
         title: 'Foto do ativo',
         context: { kind: 'asset-profile', assetId, subId },
         afterSave: async () => {
-          // Chama a implementação base diretamente para não reentrar no wrapper.
           await baseOpenAssetDetails(subId, assetId);
           attachAssetAction(subId, assetId);
         },
       });
     };
+
+    if (removeButton) {
+      removeButton.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!confirm('Remover a foto principal deste ativo?')) return;
+        removeButton.disabled = true;
+        try {
+          await removeAssetProfilePhoto(assetId);
+          toast(navigator.onLine
+            ? 'Foto do ativo removida.'
+            : 'Foto removida no dispositivo e aguardando sincronização.',
+            navigator.onLine ? 'success' : 'notice');
+          await baseOpenAssetDetails(subId, assetId);
+          attachAssetAction(subId, assetId);
+        } catch (error) {
+          removeButton.disabled = false;
+          showMediaError(error);
+        }
+      };
+    }
   }
 
   const baseOpenAssetDetails = openAssetDetails;
@@ -642,7 +763,7 @@
     const root = document.getElementById('modal-root');
     if (!root) return;
     const local = await localAvatar();
-    root.innerHTML = `<div class="modal" id="profile-photo-modal"><div class="modal-card profile-photo-dialog"><button class="modal-close" id="close-profile-photo" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Foto do perfil</h2><p class="muted">No celular, escolha câmera ou galeria. No computador, selecione uma imagem do dispositivo.</p><div class="profile-photo-preview" id="profile-photo-preview">${local ? `<img src="${blobUrl(local)}" alt="Foto atual">` : esc(u.initials)}</div><div class="profile-photo-actions"><button class="btn secondary" id="choose-profile-photo" type="button"><span data-icon="camera"></span>${local ? 'Alterar foto' : 'Adicionar foto'}</button>${(local || state.cloudProfile?.avatar_path) ? '<button class="btn ghost" id="remove-profile-photo" type="button"><span data-icon="trash"></span>Remover foto</button>' : ''}</div></div></div>`;
+    root.innerHTML = `<div class="modal" id="profile-photo-modal"><div class="modal-card profile-photo-dialog"><button class="modal-close" id="close-profile-photo" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Foto do perfil</h2><p class="muted">No celular, escolha câmera ou galeria. No computador, selecione uma imagem do dispositivo.</p><div class="profile-photo-preview" id="profile-photo-preview">${local ? `<img src="${blobUrl(local)}" alt="Foto atual">` : esc(u.initials)}</div><div class="profile-photo-actions"><button class="btn secondary" id="choose-profile-photo" type="button">${local ? 'Alterar foto' : 'Adicionar foto'}</button>${(local || state.cloudProfile?.avatar_path) ? '<button class="btn ghost" id="remove-profile-photo" type="button">Remover foto</button>' : ''}</div></div></div>`;
     hydrateIcons(root);
     const close = () => { root.innerHTML = ''; };
     document.getElementById('close-profile-photo').onclick = close;
@@ -833,10 +954,11 @@
   }
 
   globalThis.CentralMedia = Object.freeze({
-    version: '4.0.0',
+    version: '4.1.0',
     pickImages,
     pickImage,
     saveAssetProfilePhoto,
+    removeAssetProfilePhoto,
     saveAvatar,
     syncPending,
     installNativeSpreadsheetExport,

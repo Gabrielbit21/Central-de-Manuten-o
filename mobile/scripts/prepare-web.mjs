@@ -56,8 +56,8 @@ if (!existsSync(mediaCoreSource)) {
   throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
 }
 const mediaCoreText = readFileSync(mediaCoreSource, 'utf8');
-if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V4')) {
-  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V4.');
+if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V4') || !mediaCoreText.includes('FINAL_UX_V4_1')) {
+  throw new Error('media-core.js não contém as assinaturas CENTRAL_MEDIA_CORE_V4 + FINAL_UX_V4_1.');
 }
 new Function(mediaCoreText);
 
@@ -143,7 +143,7 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
-  mediaCore: '4.0.0',
+  mediaCore: '4.1.0',
   nativeBridge: '5.0.0',
   serviceWorker: 'disabled-in-native',
 }, null, 2), 'utf8');
