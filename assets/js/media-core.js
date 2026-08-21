@@ -1,4 +1,4 @@
-/* CENTRAL_MEDIA_CORE_V3
+/* CENTRAL_MEDIA_CORE_V4
  * Camada única de mídia da Central de Manutenção SE.
  *
  * Princípios:
@@ -12,8 +12,8 @@
 (() => {
   'use strict';
 
-  if (globalThis.__CENTRAL_MEDIA_CORE_V3__) return;
-  globalThis.__CENTRAL_MEDIA_CORE_V3__ = true;
+  if (globalThis.__CENTRAL_MEDIA_CORE_V4__) return;
+  globalThis.__CENTRAL_MEDIA_CORE_V4__ = true;
 
   const ASSET_QUEUE_KIND = 'asset-profile-sync-v2';
   const AVATAR_QUEUE_KIND = 'user-avatar-sync-v2';
@@ -26,12 +26,28 @@
 
   function nowIso() { return new Date().toISOString(); }
   function ownerId() { return state?.cloudUser?.id || null; }
+  function isNativeAndroid() {
+    try { return globalThis.CentralNativeAndroid?.isAvailable?.() === true; }
+    catch { return false; }
+  }
+
+  async function clearIdbStore(store) {
+    const d = await db();
+    return new Promise((resolve, reject) => {
+      const tx = d.transaction(store, 'readwrite');
+      tx.objectStore(store).clear();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error || new Error(`Falha ao limpar ${store}.`));
+    });
+  }
+
+  let androidAssetCacheRepairPromise = Promise.resolve();
 
   function diagnostic(stage, status, detail = {}) {
     const entry = { at: nowIso(), stage, status, ...detail };
     diagnostics.push(entry);
     if (diagnostics.length > 40) diagnostics.shift();
-    try { sessionStorage.setItem('central_media_v2_diagnostics', JSON.stringify(diagnostics.slice(-20))); } catch {}
+    try { sessionStorage.setItem('central_media_v4_diagnostics', JSON.stringify(diagnostics.slice(-20))); } catch {}
     return entry;
   }
 
@@ -44,7 +60,7 @@
     wrapped.centralMediaStage = stage;
     wrapped.cause = original;
     diagnostic(stage, 'error', { message: original.message || String(original), context });
-    console.error('[Media V3]', stage, context, original);
+    console.error('[Media V4]', stage, context, original);
     return wrapped;
   }
 
@@ -136,20 +152,36 @@
     return files?.[0] || null;
   }
 
-  async function validateImageBlob(blob) {
+  function validateBlobEnvelope(blob) {
     if (!(blob instanceof Blob) || !blob.size) throw new Error('Arquivo de imagem vazio ou inválido.');
     if (blob.size > MAX_SOURCE_BYTES) throw new Error('Imagem acima do limite de processamento de 24 MB.');
+    if (blob.type && !String(blob.type).toLowerCase().startsWith('image/')) {
+      throw new Error(`Arquivo recebido não é uma imagem (${blob.type}).`);
+    }
+    return { bytes: blob.size, type: blob.type || 'image/jpeg' };
+  }
+
+  async function validateImageBlob(blob) {
+    const envelope = validateBlobEnvelope(blob);
+    // No Android o Camera plugin já redimensiona/corrige a imagem nativamente.
+    // Não usamos createImageBitmap/canvas no WebView: esse era o ponto comum
+    // entre câmera, galeria, foto principal e fotos da manutenção.
+    if (isNativeAndroid()) return envelope;
     const bitmap = await createImageBitmap(blob);
     try {
       if (!bitmap.width || !bitmap.height) throw new Error('A imagem não possui dimensões válidas.');
-      return { width: bitmap.width, height: bitmap.height };
+      return { ...envelope, width: bitmap.width, height: bitmap.height };
     } finally {
       bitmap.close?.();
     }
   }
 
-  async function compressValidated(source, max = 1000, quality = .82, context = {}) {
-    await stage('decode-source', () => validateImageBlob(source), context);
+  async function prepareImageBlob(source, max = 1000, quality = .82, context = {}) {
+    await stage('validate-source', () => validateImageBlob(source), context);
+    if (isNativeAndroid()) {
+      // A origem já veio do Camera/Gallery com targetWidth/targetHeight e quality.
+      return source;
+    }
     const blob = await stage('compress', () => compressImage(source, max, quality), context);
     if (!blob) throw mediaError('compress', new Error('Falha ao gerar JPEG comprimido.'), context);
     await stage('validate-output', () => validateImageBlob(blob), context);
@@ -233,7 +265,8 @@
   async function saveAssetProfilePhoto(assetId, source) {
     if (!assetId || !source) return null;
     const context = { assetId };
-    const blob = await compressValidated(source, 1000, .82, context);
+    await androidAssetCacheRepairPromise;
+    const blob = await prepareImageBlob(source, 1000, .82, context);
     // Só substitui o cache depois que o JPEG final foi decodificado e validado.
     await stage('local-asset-commit', () => idbPut('assetPhotos', {
       assetId, blob, updatedAt: nowIso(),
@@ -241,7 +274,7 @@
     const entry = await queueAssetProfile(assetId, blob);
     if (entry && navigator.onLine && state.cloudUser?.id) {
       try { await syncAssetEntry(entry); }
-      catch (error) { console.warn('[Media V3] Foto local válida; sincronização ficou pendente.', error); }
+      catch (error) { console.warn('[Media V4] Foto local válida; sincronização ficou pendente.', error); }
     }
     return blob;
   }
@@ -258,32 +291,81 @@
     let processed = 0;
     for (const entry of await pendingEntries(ASSET_QUEUE_KIND)) {
       try { if (await syncAssetEntry(entry)) processed += 1; }
-      catch (error) { console.warn('[Media V3] Foto de ativo pendente:', error); }
+      catch (error) { console.warn('[Media V4] Foto de ativo pendente:', error); }
     }
     return processed;
   }
 
-  const basePhotoForAsset = photoForAsset;
-  photoForAsset = async function safePhotoForAsset(assetId) {
-    const local = await idbGet('assetPhotos', assetId).catch(() => null);
-    if (local?.blob) {
-      try {
-        await validateImageBlob(local.blob);
-        return local.blob;
-      } catch (error) {
-        console.warn('[Media V3] Cache local inválido removido do ativo:', assetId, error);
-        diagnostic('repair-asset-cache', 'removed', { assetId, message: String(error?.message || error) });
-        await idbDelete('assetPhotos', assetId).catch(() => {});
+  function findAssetAnywhere(assetId) {
+    for (const sub of Object.values(DATA.equipment || {})) {
+      for (const group of ['eletronicos', 'reles', 'patio']) {
+        const asset = (sub?.[group] || []).find(item => item.id === assetId);
+        if (asset) return asset;
       }
     }
-    const fallback = await basePhotoForAsset(assetId);
-    if (!fallback) return null;
+    return null;
+  }
+
+  async function queuedAssetProfileBlob(assetId) {
+    const uid = ownerId();
+    if (!uid) return null;
+    const entry = await idbGet('appSettings', assetQueueKey(uid, assetId)).catch(() => null);
+    if (!entry?.blob) return null;
+    try { await validateImageBlob(entry.blob); return entry.blob; }
+    catch { return null; }
+  }
+
+  async function sanitizeAndroidAssetCacheOnce() {
+    if (!isNativeAndroid()) return;
+    const markerKey = 'media:v4:android-asset-cache-sanitized';
+    const marker = await idbGet('appSettings', markerKey).catch(() => null);
+    if (marker?.done) return;
+    // assetPhotos é cache de foto principal. A fila offline fica em appSettings
+    // e não é apagada; fotos de manutenção/relatórios/rascunhos também não.
+    await clearIdbStore('assetPhotos');
+    await idbPut('appSettings', { key: markerKey, done: true, updatedAt: nowIso() });
+    diagnostic('android-cache-repair', 'ok', { store: 'assetPhotos' });
+  }
+
+  androidAssetCacheRepairPromise = sanitizeAndroidAssetCacheOnce().catch(error => {
+    diagnostic('android-cache-repair', 'error', { message: String(error?.message || error) });
+  });
+
+  photoForAsset = async function safePhotoForAssetV4(assetId) {
+    await androidAssetCacheRepairPromise;
+
     try {
-      await validateImageBlob(fallback);
-      return fallback;
+      const local = await idbGet('assetPhotos', assetId);
+      if (local?.blob) {
+        await validateImageBlob(local.blob);
+        return local.blob;
+      }
     } catch (error) {
+      diagnostic('repair-asset-cache', 'removed', { assetId, message: String(error?.message || error) });
       await idbDelete('assetPhotos', assetId).catch(() => {});
-      diagnostic('repair-asset-cache', 'remote-invalid', { assetId, message: String(error?.message || error) });
+    }
+
+    // Se a foto foi salva offline antes da limpeza corretiva, recupera da fila.
+    const queued = await queuedAssetProfileBlob(assetId);
+    if (queued) {
+      await idbPut('assetPhotos', { assetId, blob: queued, updatedAt: nowIso() }).catch(() => {});
+      return queued;
+    }
+
+    const asset = findAssetAnywhere(assetId);
+    if (!asset?.profilePhotoPath || !navigator.onLine || !state.cloudUser) return null;
+
+    try {
+      const { data, error } = await cloudClient.storage
+        .from('asset-profile-photos')
+        .download(asset.profilePhotoPath);
+      if (error || !data) return null;
+      await validateImageBlob(data);
+      await idbPut('assetPhotos', { assetId, blob: data, updatedAt: nowIso() });
+      return data;
+    } catch (error) {
+      diagnostic('cloud-asset-photo-read', 'error', { assetId, message: String(error?.message || error) });
+      await idbDelete('assetPhotos', assetId).catch(() => {});
       return null;
     }
   };
@@ -309,7 +391,7 @@
       if (entry.action === 'remove') {
         if (entry.oldPath) {
           const { error } = await cloudClient.storage.from('user-profile-photos').remove([entry.oldPath]);
-          if (error) console.warn('[Media V3] Remoção do avatar anterior:', error);
+          if (error) console.warn('[Media V4] Remoção do avatar anterior:', error);
         }
         const { error } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: null });
         if (error) throw error;
@@ -337,7 +419,7 @@
 
   async function saveAvatar(source) {
     if (!state.cloudUser?.id) throw new Error('Sessão do usuário indisponível. Entre novamente.');
-    const blob = await compressValidated(source, 700, .85, { kind: 'user-avatar' });
+    const blob = await prepareImageBlob(source, 700, .85, { kind: 'user-avatar' });
     const path = `${state.cloudUser.id}/avatar.jpg`;
     await stage('local-avatar-commit', () => idbPut('appSettings', {
       key: `user-avatar:${state.cloudUser.id}`, blob, path, updatedAt: nowIso(),
@@ -347,7 +429,7 @@
     const entry = await queueAvatar(blob, 'set');
     if (entry && navigator.onLine) {
       try { await syncAvatarEntry(entry); }
-      catch (error) { console.warn('[Media V3] Avatar local válido; sincronização pendente.', error); }
+      catch (error) { console.warn('[Media V4] Avatar local válido; sincronização pendente.', error); }
     }
     updateRoleChrome();
     return blob;
@@ -362,7 +444,7 @@
     const entry = await queueAvatar(null, 'remove', oldPath);
     if (entry && navigator.onLine) {
       try { await syncAvatarEntry(entry); }
-      catch (error) { console.warn('[Media V3] Remoção do avatar pendente.', error); }
+      catch (error) { console.warn('[Media V4] Remoção do avatar pendente.', error); }
     }
     updateRoleChrome();
   }
@@ -372,7 +454,7 @@
     let processed = 0;
     for (const entry of await pendingEntries(AVATAR_QUEUE_KIND)) {
       try { if (await syncAvatarEntry(entry)) processed += 1; }
-      catch (error) { console.warn('[Media V3] Avatar pendente:', error); }
+      catch (error) { console.warn('[Media V4] Avatar pendente:', error); }
     }
     return processed;
   }
@@ -421,16 +503,45 @@
     } finally { assetPhotoBusy = false; }
   }
 
-  globalThis.chooseProfilePhoto = async function chooseProfilePhotoV2(assetId) {
+  globalThis.chooseProfilePhoto = async function chooseProfilePhotoV4(assetId) {
     return chooseAssetProfilePhoto(assetId, {
       context: { kind: 'asset-profile', assetId },
       afterSave: async () => { if (state.screen === 'activity') await renderActivity(); },
     });
   };
 
+  // No Android não reconvertemos a imagem com createImageBitmap/canvas.
+  // O Camera plugin já devolve a imagem redimensionada; armazenamos o Blob
+  // diretamente nas fotos pendentes.
+  const baseAddPendingPhotos = addPendingPhotos;
+  addPendingPhotos = async function addPendingPhotosV4(files) {
+    if (!isNativeAndroid()) return baseAddPendingPhotos(files);
+    for (const file of files || []) {
+      if (!(file instanceof Blob)) continue;
+      try {
+        await stage('maintenance-native-accept', () => validateImageBlob(file), {
+          bytes: file.size || 0,
+          type: file.type || '',
+        });
+        state.pendingPhotos.push({
+          id: uid(),
+          blob: file,
+          category: 'Antes',
+          assetId: 'all',
+          caption: '',
+          asProfile: false,
+          originalName: file.name || `foto-${Date.now()}.jpg`,
+        });
+      } catch (error) {
+        showMediaError(error);
+      }
+    }
+    drawPendingPhotos(currentFormAssets());
+  };
+
   // Evita que persistPendingPhotos grave uma foto principal sem validação.
   const basePersistPendingPhotos = persistPendingPhotos;
-  persistPendingPhotos = async function persistPendingPhotosV2(recordId, sel, createdAt) {
+  persistPendingPhotos = async function persistPendingPhotosV4(recordId, sel, createdAt) {
     const selected = (state.pendingPhotos || [])
       .filter(photo => photo?.asProfile && photo.assetId && photo.assetId !== 'all')
       .map(photo => ({ photo, assetId: photo.assetId }));
@@ -441,7 +552,7 @@
     finally { (state.pendingPhotos || []).forEach((photo, i) => { photo.asProfile = originalFlags[i] || false; }); }
     for (const item of selected) {
       try { await saveAssetProfilePhoto(item.assetId, item.photo.blob); }
-      catch (error) { console.warn('[Media V3] Promoção de foto da manutenção:', error); }
+      catch (error) { console.warn('[Media V4] Promoção de foto da manutenção:', error); }
     }
     return result;
   };
@@ -470,7 +581,7 @@
   }
 
   const baseRenderActivity = renderActivity;
-  renderActivity = async function renderActivityV2(...args) {
+  renderActivity = async function renderActivityV4(...args) {
     const result = await baseRenderActivity.apply(this, args);
     bindActivityMedia();
     return result;
@@ -504,13 +615,13 @@
   }
 
   const baseOpenAssetDetails = openAssetDetails;
-  openAssetDetails = async function openAssetDetailsV2(subId, assetId) {
+  openAssetDetails = async function openAssetDetailsV4(subId, assetId) {
     try {
       const result = await baseOpenAssetDetails(subId, assetId);
       attachAssetAction(subId, assetId);
       return result;
     } catch (error) {
-      console.error('[Media V3] Abertura de ativo:', assetId, error);
+      console.error('[Media V4] Abertura de ativo:', assetId, error);
       throw error;
     }
   };
@@ -526,7 +637,7 @@
     return { u, p, primaryName, secondary };
   }
 
-  async function openProfilePhotoDialogV2() {
+  async function openProfilePhotoDialogV4() {
     const u = currentUser();
     const root = document.getElementById('modal-root');
     if (!root) return;
@@ -552,7 +663,7 @@
     });
   }
 
-  async function openMyProfileDialogV2() {
+  async function openMyProfileDialogV4() {
     const { u, p, primaryName, secondary } = profileIdentity();
     const root = document.getElementById('modal-root');
     if (!root) return;
@@ -561,7 +672,7 @@
     const close = () => { root.innerHTML = ''; };
     document.getElementById('close-my-profile').onclick = close;
     document.getElementById('my-profile-modal').onclick = event => { if (event.target === event.currentTarget) event.stopPropagation(); };
-    document.getElementById('profile-avatar-edit').onclick = () => openProfilePhotoDialogV2();
+    document.getElementById('profile-avatar-edit').onclick = () => openProfilePhotoDialogV4();
     const pushButton = document.getElementById('push-device-toggle');
     pushButton.onclick = async event => {
       const button = event.currentTarget;
@@ -612,22 +723,22 @@
     Promise.resolve().then(() => refreshPushDeviceCard()).catch(() => {});
   }
 
-  openProfilePhotoDialog = openProfilePhotoDialogV2;
-  openMyProfileDialog = openMyProfileDialogV2;
+  openProfilePhotoDialog = openProfilePhotoDialogV4;
+  openMyProfileDialog = openMyProfileDialogV4;
 
   // O avatar desktop tinha um addEventListener com a função antiga capturada.
   // Clonamos uma única vez para remover somente esse listener legado.
   function installDesktopProfileOpener() {
     const old = document.getElementById('user-avatar');
-    if (!old || old.dataset.centralMediaV2 === '1') return;
+    if (!old || old.dataset.centralMediaV4 === '1') return;
     const clone = old.cloneNode(true);
-    clone.dataset.centralMediaV2 = '1';
+    clone.dataset.centralMediaV4 = '1';
     old.replaceWith(clone);
-    clone.addEventListener('click', () => openMyProfileDialogV2());
+    clone.addEventListener('click', () => openMyProfileDialogV4());
   }
 
   const baseEnterApplication = enterApplication;
-  enterApplication = async function enterApplicationV2(...args) {
+  enterApplication = async function enterApplicationV4(...args) {
     const result = await baseEnterApplication.apply(this, args);
     installDesktopProfileOpener();
     if (state.cloudUser?.id && navigator.onLine) setTimeout(() => syncPending().catch(() => {}), 700);
@@ -716,13 +827,13 @@
       nativeSpreadsheetExportInstalled = xlsx.writeFile !== originalWriteFile;
       return nativeSpreadsheetExportInstalled;
     } catch (error) {
-      console.warn('[Media V3] Não foi possível instalar exportação XLSX nativa:', error);
+      console.warn('[Media V4] Não foi possível instalar exportação XLSX nativa:', error);
       return false;
     }
   }
 
   globalThis.CentralMedia = Object.freeze({
-    version: '3.0.0',
+    version: '4.0.0',
     pickImages,
     pickImage,
     saveAssetProfilePhoto,

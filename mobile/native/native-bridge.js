@@ -4,7 +4,7 @@ import { Camera, MediaTypeSelection } from '@capacitor/camera';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-/* CENTRAL_NATIVE_BRIDGE_MEDIA_V4
+/* CENTRAL_NATIVE_BRIDGE_MEDIA_V5
  * Bridge Android sem interceptação global de input[type=file].
  * A UI chama CentralNativeAndroid explicitamente via media-core.js.
  */
@@ -13,7 +13,7 @@ const isAndroidNative = () =>
   window.Capacitor?.isNativePlatform?.() === true &&
   window.Capacitor?.getPlatform?.() === 'android';
 
-const PENDING_CAMERA_KEY = 'central_mobile_pending_camera_v4';
+const PENDING_CAMERA_KEY = 'central_mobile_pending_camera_v5';
 const MAX_NATIVE_FILE_BYTES = 24 * 1024 * 1024;
 let activePickerPromise = null;
 
@@ -39,7 +39,7 @@ async function cleanupNativeWebRuntime() {
       await Promise.all(registrations.map(registration => registration.unregister().catch(() => false)));
     }
   } catch (error) {
-    console.warn('[Native Runtime V4] Falha ao remover Service Worker legado:', error);
+    console.warn('[Native Runtime V5] Falha ao remover Service Worker legado:', error);
   }
 
   try {
@@ -52,7 +52,7 @@ async function cleanupNativeWebRuntime() {
       );
     }
   } catch (error) {
-    console.warn('[Native Runtime V4] Falha ao limpar cache legado:', error);
+    console.warn('[Native Runtime V5] Falha ao limpar cache legado:', error);
   }
 }
 
@@ -222,7 +222,7 @@ async function pickImages(options = {}) {
 
 function exposeNativeApi() {
   window.CentralNativeAndroid = Object.freeze({
-    version: '4.0.0',
+    version: '5.0.0',
     isAvailable: () => true,
     runtimeReady: () => runtimeCleanupPromise,
     pickImages: (options = {}) => pickImages(options),
@@ -244,7 +244,7 @@ function installRestoredCameraHandler() {
         detail: { files, context: pending.context || null },
       }));
     } catch (error) {
-      console.error('[Native Media V3] restored result:', error);
+      console.error('[Native Media V5] restored result:', error);
     } finally {
       clearPendingCamera();
       activePickerPromise = null;
@@ -252,9 +252,6 @@ function installRestoredCameraHandler() {
   });
 }
 
-const blobUrlMap = new Map();
-const originalCreateObjectURL = URL.createObjectURL.bind(URL);
-const originalRevokeObjectURL = URL.revokeObjectURL.bind(URL);
 const originalAnchorClick = HTMLAnchorElement.prototype.click;
 
 function safeFilename(value) {
@@ -275,6 +272,7 @@ function blobToBase64(blob) {
 }
 
 async function shareBlob(blob, filename) {
+  if (!(blob instanceof Blob) || !blob.size) throw new Error('Arquivo vazio ou inválido.');
   const finalName = safeFilename(filename);
   const path = `exports/${Date.now()}-${finalName}`;
   const data = await blobToBase64(blob);
@@ -284,25 +282,25 @@ async function shareBlob(blob, filename) {
 }
 
 function installNativeFileSharing() {
-  URL.createObjectURL = function createObjectURL(object) {
-    const url = originalCreateObjectURL(object);
-    if (object instanceof Blob) blobUrlMap.set(url, object);
-    return url;
-  };
-  URL.revokeObjectURL = function revokeObjectURL(url) {
-    window.setTimeout(() => {
-      blobUrlMap.delete(String(url));
-      originalRevokeObjectURL(url);
-    }, 30000);
-  };
+  if (window.__CENTRAL_NATIVE_FILE_SHARING_V5__) return;
+  window.__CENTRAL_NATIVE_FILE_SHARING_V5__ = true;
+
+  // Não alteramos URL.createObjectURL/revokeObjectURL. Fotos e previews usam
+  // a implementação nativa do WebView sem qualquer monkeypatch global.
   HTMLAnchorElement.prototype.click = function nativeAwareAnchorClick() {
     const href = String(this.href || '');
     const filename = String(this.download || '');
-    const blob = filename && href.startsWith('blob:') ? blobUrlMap.get(href) : null;
-    if (!blob) return originalAnchorClick.call(this);
-    shareBlob(blob, filename).catch((error) => {
-      console.error('Native file share:', error);
-      originalAnchorClick.call(this);
-    });
+    if (!filename || !href.startsWith('blob:')) return originalAnchorClick.call(this);
+
+    fetch(href)
+      .then(response => {
+        if (!response.ok) throw new Error(`Falha ao ler arquivo (${response.status}).`);
+        return response.blob();
+      })
+      .then(blob => shareBlob(blob, filename))
+      .catch(error => {
+        console.error('Native file share:', error);
+        originalAnchorClick.call(this);
+      });
   };
 }

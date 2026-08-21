@@ -56,16 +56,16 @@ if (!existsSync(mediaCoreSource)) {
   throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
 }
 const mediaCoreText = readFileSync(mediaCoreSource, 'utf8');
-if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V3')) {
-  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V3.');
+if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V4')) {
+  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V4.');
 }
 new Function(mediaCoreText);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
 const nativeBridgeText = readFileSync(nativeBridgeSource, 'utf8');
-if (!nativeBridgeText.includes('CENTRAL_NATIVE_BRIDGE_MEDIA_V4')) {
-  throw new Error('native-bridge.js não contém a assinatura CENTRAL_NATIVE_BRIDGE_MEDIA_V4.');
+if (!nativeBridgeText.includes('CENTRAL_NATIVE_BRIDGE_MEDIA_V5')) {
+  throw new Error('native-bridge.js não contém a assinatura CENTRAL_NATIVE_BRIDGE_MEDIA_V5.');
 }
 if (nativeBridgeText.includes('installNativeImageInputBridge')) {
   throw new Error('native-bridge.js ainda contém interceptação global de input de imagem.');
@@ -143,8 +143,8 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
-  mediaCore: '3.0.0',
-  nativeBridge: '4.0.0',
+  mediaCore: '4.0.0',
+  nativeBridge: '5.0.0',
   serviceWorker: 'disabled-in-native',
 }, null, 2), 'utf8');
 
