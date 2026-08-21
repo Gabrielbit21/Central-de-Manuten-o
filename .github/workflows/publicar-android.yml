@@ -1,0 +1,383 @@
+name: Validar e publicar Android Native
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão sem prefixo v. Se vazio, usa version.json.'
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - '.github/workflows/publicar-android.yml'
+      - '.github/workflows/validar-android.yml'
+      - 'mobile/**'
+      - 'index.html'
+      - 'app.js'
+      - 'manifest.webmanifest'
+      - 'sw.js'
+      - 'version.json'
+      - 'assets/**'
+      - 'vendor/**'
+
+concurrency:
+  group: android-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-native:
+    name: Compilar e validar APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      app_version: ${{ steps.metadata.outputs.app_version }}
+      version_code: ${{ steps.metadata.outputs.version_code }}
+      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+
+    steps:
+      - name: Baixar código revisável
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolver metadados e validar versões
+        id: metadata
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          version="$(python3 - <<'PY'
+          import json
+          with open('version.json', encoding='utf-8') as handle:
+              print(json.load(handle)['build'])
+          PY
+          )"
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Versão inválida em version.json: '$version'." >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "${REQUESTED_VERSION:-}" && "$REQUESTED_VERSION" != "$version" ]]; then
+            echo "A versão solicitada ($REQUESTED_VERSION) não coincide com version.json ($version)." >&2
+            exit 1
+          fi
+
+          package_version="$(python3 - <<'PY'
+          import json
+          with open('mobile/package.json', encoding='utf-8') as handle:
+              print(json.load(handle)['version'])
+          PY
+          )"
+          if [[ "$package_version" != "$version" ]]; then
+            echo "mobile/package.json ($package_version) não coincide com version.json ($version)." >&2
+            exit 1
+          fi
+
+          python3 - "$version" <<'PY'
+          import pathlib, re, sys
+          version = sys.argv[1]
+          app = pathlib.Path('app.js').read_text(encoding='utf-8')
+          for constant in ('APP_VERSION', 'APP_BUILD'):
+              match = re.search(rf"const\s+{constant}\s*=\s*['\"]([^'\"]+)['\"]", app)
+              if not match or match.group(1) != version:
+                  raise SystemExit(f'{constant} em app.js não coincide com version.json ({version}).')
+          html = pathlib.Path('index.html').read_text(encoding='utf-8')
+          if f'v{version}</title>' not in html:
+              raise SystemExit(f'index.html não identifica v{version} no título.')
+          if f'id="environment-footer-version">v{version}</span>' not in html:
+              raise SystemExit(f'index.html não identifica v{version} no rodapé.')
+          PY
+
+          IFS='.' read -r major minor patch <<< "$version"
+          if (( major > 999 || minor > 999 || patch > 999 )); then
+            echo "Cada componente da versão Android deve ficar entre 0 e 999." >&2
+            exit 1
+          fi
+          version_code=$(( major * 1000000 + minor * 1000 + patch ))
+          if (( version_code <= 0 || version_code > 2100000000 )); then
+            echo "versionCode Android inválido: $version_code" >&2
+            exit 1
+          fi
+
+          artifact_name="Central-Manutencao-SE-Android-Native-v${version}-run-${RUN_ID}-attempt-${RUN_ATTEMPT}"
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "app_version=$version" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+          echo "Aplicativo Android: $version"
+          echo "versionCode: $version_code"
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package.json
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Instalar dependências Android
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+
+      - name: Validar JavaScript nativo
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check mobile/native/native-bridge.js
+          node --check mobile/scripts/configure-android.mjs
+
+      - name: Preparar interface embarcada
+        working-directory: mobile
+        run: npm run web:prepare
+
+      - name: Criar projeto Android reproduzível
+        working-directory: mobile
+        run: npx cap add android
+
+      - name: Aplicar identidade, versão e ícones oficiais
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node scripts/configure-android.mjs
+          java -Djava.awt.headless=true \
+            scripts/GenerateAndroidIcons.java \
+            ../assets/icons/app-icon-source.png \
+            android/app/src/main/res
+
+      - name: Validar recursos Android gerados
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          grep -F "versionCode $ANDROID_VERSION_CODE" android/app/build.gradle
+          grep -F "versionName \"$APP_VERSION\"" android/app/build.gradle
+          grep -F 'android:icon="@mipmap/ic_launcher"' android/app/src/main/AndroidManifest.xml
+          grep -F 'android:roundIcon="@mipmap/ic_launcher_round"' android/app/src/main/AndroidManifest.xml
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            for icon in ic_launcher.png ic_launcher_round.png ic_launcher_foreground.png; do
+              test -s "android/app/src/main/res/mipmap-${density}/${icon}"
+            done
+          done
+          test -s android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -s android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          test -s android/app/src/main/res/values/ic_launcher_background.xml
+
+      - name: Compilar APK release sem assinatura
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon clean assembleRelease
+
+      - name: Preparar APK de validação em pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_apk='mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk'
+          test -s "$source_apk"
+          mkdir -p dist/android-native
+          cp "$source_apk" "dist/android-native/Central_Manutencao_SE_Android_v${APP_VERSION}_UNSIGNED.apk"
+          sha256sum "dist/android-native/Central_Manutencao_SE_Android_v${APP_VERSION}_UNSIGNED.apk" \
+            > dist/android-native/SHA256.txt
+
+      - name: Restaurar chave privada de assinatura
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Secret obrigatório ausente: $name" >&2
+              exit 1
+            fi
+          done
+
+          keystore="$RUNNER_TEMP/central-manutencao-se-release.p12"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          test -s "$keystore"
+
+          keytool -list \
+            -keystore "$keystore" \
+            -storetype PKCS12 \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          echo "ANDROID_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Alinhar, assinar e verificar APK oficial
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          unsigned='mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk'
+          test -s "$unsigned"
+
+          build_tools_version="$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)"
+          if [[ -z "$build_tools_version" ]]; then
+            echo 'Android build-tools não encontrado.' >&2
+            exit 1
+          fi
+
+          zipalign="$ANDROID_SDK_ROOT/build-tools/$build_tools_version/zipalign"
+          apksigner="$ANDROID_SDK_ROOT/build-tools/$build_tools_version/apksigner"
+          aapt="$ANDROID_SDK_ROOT/build-tools/$build_tools_version/aapt"
+          for tool in "$zipalign" "$apksigner" "$aapt"; do
+            test -x "$tool"
+          done
+
+          dist='dist/android-native'
+          mkdir -p "$dist"
+          aligned="$RUNNER_TEMP/Central_Manutencao_SE_Android_v${APP_VERSION}_aligned.apk"
+          final="$dist/Central_Manutencao_SE_Android_v${APP_VERSION}.apk"
+
+          "$zipalign" -f -p 4 "$unsigned" "$aligned"
+          "$zipalign" -c -p 4 "$aligned"
+
+          "$apksigner" sign \
+            --ks "$ANDROID_KEYSTORE_FILE" \
+            --ks-type PKCS12 \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "$final" \
+            "$aligned"
+
+          "$apksigner" verify --verbose --print-certs "$final"
+
+          badging="$RUNNER_TEMP/android-badging.txt"
+          "$aapt" dump badging "$final" | tee "$badging"
+          grep -F "package: name='io.github.gabrielbit21.centralmanutencaose' versionCode='$ANDROID_VERSION_CODE' versionName='$APP_VERSION'" "$badging"
+          grep -F "application-label:'Central de Manutenção SE'" "$badging"
+
+          sha256sum "$final" | sed "s#  $dist/#  #" > "$dist/SHA256.txt"
+
+          cat > "$dist/BUILD-MANIFEST.json" <<JSON
+          {
+            "appVersion": "$APP_VERSION",
+            "androidVersionCode": $ANDROID_VERSION_CODE,
+            "applicationId": "io.github.gabrielbit21.centralmanutencaose",
+            "appName": "Central de Manutenção SE",
+            "sourceCommit": "$GITHUB_SHA",
+            "repository": "$GITHUB_REPOSITORY",
+            "workflowRunId": "$GITHUB_RUN_ID",
+            "workflowRunAttempt": "$GITHUB_RUN_ATTEMPT",
+            "androidBuildTools": "$build_tools_version",
+            "signatureSchemeVerified": true
+          }
+          JSON
+
+          cat > "$dist/LEIA-ME.txt" <<TXT
+          Central de Manutenção SE v$APP_VERSION - Android Native
+
+          Arquivo para instalação:
+          Central_Manutencao_SE_Android_v$APP_VERSION.apk
+
+          Identidade do aplicativo:
+          io.github.gabrielbit21.centralmanutencaose
+
+          O APK foi compilado em modo Release, alinhado com zipalign, assinado com a chave privada oficial do projeto e validado com apksigner.
+          O ícone do aplicativo usa a identidade Energisa versionada em assets/icons/app-icon-source.png.
+
+          Importante: APKs debug usados durante os testes anteriores podem ter assinatura diferente. Nesse caso, faça backup/sincronização dos dados pendentes, desinstale a versão de teste uma única vez e instale este APK oficial. As próximas versões oficiais poderão atualizar esta instalação sem desinstalar, desde que a mesma chave de assinatura seja preservada.
+
+          Commit de origem: $GITHUB_SHA
+          TXT
+
+      - name: Guardar artefato Android validado
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: dist/**
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-release:
+    name: Publicar release Android imutável
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    needs: build-android-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Baixar APK validado
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build-android-native.outputs.artifact_name }}
+          path: release
+
+      - name: Validar e publicar release sem sobrescrita
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ needs.build-android-native.outputs.app_version }}
+        run: |
+          set -euo pipefail
+
+          tag="android-native-v${APP_VERSION}"
+          apk="release/android-native/Central_Manutencao_SE_Android_v${APP_VERSION}.apk"
+          checksum="release/android-native/SHA256.txt"
+          manifest="release/android-native/BUILD-MANIFEST.json"
+          readme="release/android-native/LEIA-ME.txt"
+
+          for asset in "$apk" "$checksum" "$manifest" "$readme"; do
+            if [[ ! -f "$asset" ]]; then
+              echo "Asset ausente: $asset" >&2
+              exit 1
+            fi
+          done
+
+          (cd release/android-native && sha256sum -c SHA256.txt)
+
+          manifest_sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["sourceCommit"])' "$manifest")"
+          if [[ "$manifest_sha" != "$GITHUB_SHA" ]]; then
+            echo "BUILD-MANIFEST.json pertence ao commit $manifest_sha, não ao commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release $tag já existe. Releases Android publicadas não são sobrescritas; incremente version.json." >&2
+            exit 1
+          fi
+
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "A tag $tag já existe. O workflow não reutiliza tags de release." >&2
+            exit 1
+          fi
+
+          gh release create "$tag" \
+            "$apk" "$checksum" "$manifest" "$readme" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Central de Manutenção SE v${APP_VERSION} - Android Native" \
+            --notes-file "$readme"
+
+          gh release view "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,url,targetCommitish
