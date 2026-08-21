@@ -47,23 +47,28 @@ for (const file of mobileFiles) {
   cpSync(source, join(webDir, file));
 }
 
-/*
- * A lógica de mídia agora é compartilhada por PWA, Windows e Android.
- * O Android não concatena mais android-app-patch.js ao app.js.
- */
+// A mesma camada de negócio é carregada em PWA, Windows e Android.
+// A diferença de plataforma fica isolada no CentralNativeAndroid, sem
+// interceptar input[type=file] nem concatenar patches ao app.js.
 const mediaCoreSource = join(repoRoot, 'assets', 'js', 'media-core.js');
 if (!existsSync(mediaCoreSource)) {
   throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
 }
 const mediaCoreText = readFileSync(mediaCoreSource, 'utf8');
-if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V1')) {
-  throw new Error('media-core.js não contém a assinatura esperada.');
+if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V2')) {
+  throw new Error('media-core.js não contém a assinatura CENTRAL_MEDIA_CORE_V2.');
 }
-// Validação sintática no próprio workflow Android.
 new Function(mediaCoreText);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
+const nativeBridgeText = readFileSync(nativeBridgeSource, 'utf8');
+if (!nativeBridgeText.includes('CENTRAL_NATIVE_BRIDGE_MEDIA_V3')) {
+  throw new Error('native-bridge.js não contém a assinatura CENTRAL_NATIVE_BRIDGE_MEDIA_V3.');
+}
+if (nativeBridgeText.includes('installNativeImageInputBridge')) {
+  throw new Error('native-bridge.js ainda contém interceptação global de input de imagem.');
+}
 
 buildSync({
   entryPoints: [nativeBridgeSource],
@@ -83,8 +88,6 @@ const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 const mobileJsTag = '<script src="./mobile-native.js"></script>';
 
-// Segurança adicional: se a referência compartilhada ainda não tiver sido
-// incluída no index raiz, o APK continua recebendo a camada de mídia.
 if (!html.includes(mediaCoreTag)) {
   const appTag = '<script src="./app.js"></script>';
   if (!html.includes(appTag)) throw new Error('index.html não contém a referência esperada a app.js');

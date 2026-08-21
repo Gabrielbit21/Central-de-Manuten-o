@@ -1,31 +1,67 @@
-/* CENTRAL_MEDIA_CORE_V1
- * HOTFIX_ANDROID_PICKER_V1 — preserva o caminho nativo já validado e mantém a fila compartilhada.
- * Camada compartilhada de mídia da Central de Manutenção SE.
- * Carregada depois de app.js em PWA, Windows Native e Android Native.
+/* CENTRAL_MEDIA_CORE_V2
+ * Camada única de mídia da Central de Manutenção SE.
  *
- * Responsabilidades:
- * - um único seletor de imagens por plataforma;
- * - foto principal de ativo com cache local + fila offline + Supabase;
- * - uso de foto de manutenção como foto principal com a mesma persistência;
- * - foto do usuário com seleção comum e fila offline;
- * - mesma ação de foto na ficha do Banco de Dados;
- * - perfil abre imediatamente, sem bloquear a UI esperando Storage.
+ * Princípios:
+ * - um único seletor por plataforma;
+ * - nenhum listener global interceptando input[type=file];
+ * - validação/compressão antes de tocar no cache do ativo;
+ * - persistência local-first + fila idempotente para Supabase;
+ * - recuperação automática de blobs locais inválidos;
+ * - diagnóstico por estágio em vez de erro genérico.
  */
 (() => {
   'use strict';
 
-  if (globalThis.__CENTRAL_MEDIA_CORE_V1__) return;
-  globalThis.__CENTRAL_MEDIA_CORE_V1__ = true;
+  if (globalThis.__CENTRAL_MEDIA_CORE_V2__) return;
+  globalThis.__CENTRAL_MEDIA_CORE_V2__ = true;
 
-  const ASSET_QUEUE_KIND = 'asset-profile-sync-v1';
-  const AVATAR_QUEUE_KIND = 'user-avatar-sync-v1';
-  const ASSET_QUEUE_PREFIX = 'media:asset-profile:';
-  const AVATAR_QUEUE_PREFIX = 'media:user-avatar:';
+  const ASSET_QUEUE_KIND = 'asset-profile-sync-v2';
+  const AVATAR_QUEUE_KIND = 'user-avatar-sync-v2';
+  const ASSET_QUEUE_PREFIX = 'media:v2:asset-profile:';
+  const AVATAR_QUEUE_PREFIX = 'media:v2:user-avatar:';
+  const MAX_SOURCE_BYTES = 24 * 1024 * 1024;
+  const diagnostics = [];
   let pickerPromise = null;
   let assetPhotoBusy = false;
 
-  function currentOwnerId() {
-    return state?.cloudUser?.id || null;
+  function nowIso() { return new Date().toISOString(); }
+  function ownerId() { return state?.cloudUser?.id || null; }
+
+  function diagnostic(stage, status, detail = {}) {
+    const entry = { at: nowIso(), stage, status, ...detail };
+    diagnostics.push(entry);
+    if (diagnostics.length > 40) diagnostics.shift();
+    try { sessionStorage.setItem('central_media_v2_diagnostics', JSON.stringify(diagnostics.slice(-20))); } catch {}
+    return entry;
+  }
+
+  function mediaError(stage, error, context = {}) {
+    const original = error instanceof Error ? error : new Error(String(error || 'Falha de mídia.'));
+    if (original.centralMediaStage) return original;
+    const wrapped = new Error(`[${stage}] ${original.message || 'Falha de mídia.'}`);
+    wrapped.name = original.name || 'MediaError';
+    wrapped.stack = original.stack || wrapped.stack;
+    wrapped.centralMediaStage = stage;
+    wrapped.cause = original;
+    diagnostic(stage, 'error', { message: original.message || String(original), context });
+    console.error('[Media V2]', stage, context, original);
+    return wrapped;
+  }
+
+  async function stage(name, fn, context = {}) {
+    diagnostic(name, 'start', { context });
+    try {
+      const value = await fn();
+      diagnostic(name, 'ok', { context });
+      return value;
+    } catch (error) {
+      throw mediaError(name, error, context);
+    }
+  }
+
+  function showMediaError(error) {
+    const message = String(error?.message || error || 'Falha de mídia.');
+    if (!/cancel|cancelado|canceled/i.test(message)) toast(message, 'warning');
   }
 
   function mediaCss() {
@@ -33,7 +69,7 @@
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = './assets/css/media-core.css';
-    link.dataset.centralMediaCore = '1';
+    link.dataset.centralMediaCore = '2';
     document.head.appendChild(link);
   }
 
@@ -48,107 +84,112 @@
       input.tabIndex = -1;
 
       let settled = false;
+      const cleanup = () => {
+        window.removeEventListener('focus', onFocus, true);
+        input.remove();
+      };
       const finish = (files = []) => {
         if (settled) return;
         settled = true;
-        window.removeEventListener('focus', onFocus, true);
-        input.remove();
+        cleanup();
         resolve(files);
       };
-      const onFocus = () => {
-        // O seletor nativo fecha antes de o navegador recuperar o foco.
-        // Um pequeno atraso permite que input.files seja atualizado.
-        setTimeout(() => finish([...(input.files || [])]), 250);
-      };
+      const onFocus = () => setTimeout(() => finish([...(input.files || [])]), 250);
 
       input.addEventListener('change', () => finish([...(input.files || [])]), { once: true });
       input.addEventListener('error', () => {
         if (settled) return;
         settled = true;
-        window.removeEventListener('focus', onFocus, true);
-        input.remove();
+        cleanup();
         reject(new Error('Não foi possível abrir o seletor de imagens.'));
       }, { once: true });
       window.addEventListener('focus', onFocus, true);
       document.body.appendChild(input);
-
-      try {
-        input.click();
-      } catch (error) {
-        settled = true;
-        window.removeEventListener('focus', onFocus, true);
-        input.remove();
-        reject(error);
-      }
+      try { input.click(); }
+      catch (error) { settled = true; cleanup(); reject(error); }
     });
   }
 
   async function pickImages(options = {}) {
     if (pickerPromise) return pickerPromise;
-
-    pickerPromise = (async () => {
+    pickerPromise = stage('picker', async () => {
       const native = globalThis.CentralNativeAndroid;
       if (native?.isAvailable?.() && typeof native.pickImages === 'function') {
         return native.pickImages(options);
       }
       return browserPickImages(options);
-    })();
+    }, { multiple: Boolean(options.multiple), kind: options.context?.kind || 'generic' });
 
-    try {
-      return await pickerPromise;
-    } finally {
-      pickerPromise = null;
-    }
+    try { return await pickerPromise; }
+    finally { pickerPromise = null; }
   }
 
   async function pickImage(options = {}) {
-    // No Android usamos exatamente o método unitário que já estava validado
-    // antes da unificação. Isso evita atravessar duas camadas de seleção para
-    // uma única foto e mantém câmera/galeria isoladas da persistência.
     const native = globalThis.CentralNativeAndroid;
     if (native?.isAvailable?.() && typeof native.pickImage === 'function') {
-      return native.pickImage({ ...options, multiple: false });
+      return stage('picker', () => native.pickImage({ ...options, multiple: false }), {
+        multiple: false,
+        kind: options.context?.kind || 'generic',
+      });
     }
     const files = await pickImages({ ...options, multiple: false });
-    return files[0] || null;
+    return files?.[0] || null;
   }
 
-  globalThis.CentralMedia = Object.freeze({
-    pickImages,
-    pickImage,
-    syncPending: () => syncPendingMedia(),
-  });
-
-  function assetQueueKey(ownerId, assetId) {
-    return `${ASSET_QUEUE_PREFIX}${ownerId}:${assetId}`;
+  async function validateImageBlob(blob) {
+    if (!(blob instanceof Blob) || !blob.size) throw new Error('Arquivo de imagem vazio ou inválido.');
+    if (blob.size > MAX_SOURCE_BYTES) throw new Error('Imagem acima do limite de processamento de 24 MB.');
+    const bitmap = await createImageBitmap(blob);
+    try {
+      if (!bitmap.width || !bitmap.height) throw new Error('A imagem não possui dimensões válidas.');
+      return { width: bitmap.width, height: bitmap.height };
+    } finally {
+      bitmap.close?.();
+    }
   }
 
-  function avatarQueueKey(ownerId) {
-    return `${AVATAR_QUEUE_PREFIX}${ownerId}`;
+  async function compressValidated(source, max = 1000, quality = .82, context = {}) {
+    await stage('decode-source', () => validateImageBlob(source), context);
+    const blob = await stage('compress', () => compressImage(source, max, quality), context);
+    if (!blob) throw mediaError('compress', new Error('Falha ao gerar JPEG comprimido.'), context);
+    await stage('validate-output', () => validateImageBlob(blob), context);
+    return blob;
   }
 
-  async function queueAssetProfilePhoto(assetId, blob) {
-    const ownerId = currentOwnerId();
-    if (!ownerId || !assetId || !blob) return null;
-    const key = assetQueueKey(ownerId, assetId);
+  function assetQueueKey(uid, assetId) { return `${ASSET_QUEUE_PREFIX}${uid}:${assetId}`; }
+  function avatarQueueKey(uid) { return `${AVATAR_QUEUE_PREFIX}${uid}`; }
+
+  async function queueAssetProfile(assetId, blob) {
+    const uid = ownerId();
+    if (!uid || !assetId || !blob) return null;
+    const key = assetQueueKey(uid, assetId);
     const previous = await idbGet('appSettings', key).catch(() => null);
     const entry = {
-      key,
-      kind: ASSET_QUEUE_KIND,
-      ownerId,
-      assetId,
-      blob,
-      status: 'pendente',
-      attempts: previous?.attempts || 0,
-      lastError: '',
-      createdAt: previous?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      key, kind: ASSET_QUEUE_KIND, ownerId: uid, assetId, blob,
+      status: 'pendente', attempts: previous?.attempts || 0, lastError: '',
+      createdAt: previous?.createdAt || nowIso(), updatedAt: nowIso(),
     };
     await idbPut('appSettings', entry);
     return entry;
   }
 
-  function updateAssetPhotoPath(assetId, path) {
+  async function queueAvatar(blob, action = 'set', oldPath = null) {
+    const uid = ownerId();
+    if (!uid) return null;
+    const key = avatarQueueKey(uid);
+    const previous = await idbGet('appSettings', key).catch(() => null);
+    const entry = {
+      key, kind: AVATAR_QUEUE_KIND, ownerId: uid, action,
+      blob: action === 'set' ? blob : null,
+      oldPath: oldPath || previous?.oldPath || state.cloudProfile?.avatar_path || null,
+      status: 'pendente', attempts: previous?.attempts || 0, lastError: '',
+      createdAt: previous?.createdAt || nowIso(), updatedAt: nowIso(),
+    };
+    await idbPut('appSettings', entry);
+    return entry;
+  }
+
+  function updateAssetPath(assetId, path) {
     for (const sub of Object.values(DATA.equipment || {})) {
       for (const group of ['eletronicos', 'reles', 'patio']) {
         const asset = (sub?.[group] || []).find(item => item.id === assetId);
@@ -157,363 +198,321 @@
     }
   }
 
-  async function syncAssetProfileEntry(entry) {
-    if (!entry || entry.kind !== ASSET_QUEUE_KIND) return false;
-    if (!navigator.onLine || !state.cloudUser?.id) return false;
+  async function syncAssetEntry(entry) {
+    if (!entry || entry.kind !== ASSET_QUEUE_KIND || !navigator.onLine || !state.cloudUser?.id) return false;
     if (entry.ownerId !== state.cloudUser.id) return false;
-
     entry.attempts = (entry.attempts || 0) + 1;
-    entry.updatedAt = new Date().toISOString();
+    entry.updatedAt = nowIso();
     await idbPut('appSettings', entry);
-
-    // Caminho estável: retries são idempotentes e não deixam arquivos órfãos.
     const path = `${state.cloudUser.id}/${entry.assetId}/profile.jpg`;
     try {
-      const { error: uploadError } = await cloudClient.storage
-        .from('asset-profile-photos')
-        .upload(path, entry.blob, { contentType: 'image/jpeg', upsert: true });
-      if (uploadError) throw uploadError;
-
-      const { error: rpcError } = await cloudClient.rpc('set_asset_profile_photo', {
-        p_asset_id: entry.assetId,
-        p_storage_path: path,
-      });
-      if (rpcError) throw rpcError;
-
-      updateAssetPhotoPath(entry.assetId, path);
+      await stage('cloud-asset-upload', async () => {
+        const { error } = await cloudClient.storage.from('asset-profile-photos')
+          .upload(path, entry.blob, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw error;
+      }, { assetId: entry.assetId });
+      await stage('cloud-asset-rpc', async () => {
+        const { error } = await cloudClient.rpc('set_asset_profile_photo', {
+          p_asset_id: entry.assetId,
+          p_storage_path: path,
+        });
+        if (error) throw error;
+      }, { assetId: entry.assetId });
+      updateAssetPath(entry.assetId, path);
       await idbDelete('appSettings', entry.key);
       return true;
     } catch (error) {
       entry.status = 'erro';
       entry.lastError = String(error?.message || error);
-      entry.updatedAt = new Date().toISOString();
+      entry.updatedAt = nowIso();
       await idbPut('appSettings', entry);
       throw error;
     }
   }
 
-  // Mantemos como base a rotina que já estava validada no desktop/PWA e no
-  // Android anterior. A camada compartilhada acrescenta apenas a fila offline.
-  const baseSetAssetPhoto = setAssetPhoto;
-  setAssetPhoto = async function sharedSetAssetPhoto(assetId, file) {
-    if (!assetId || !file) return null;
-
-    let blob = null;
-    let cloudError = null;
-    try {
-      blob = await baseSetAssetPhoto(assetId, file);
-    } catch (error) {
-      // A implementação base grava localmente antes do upload. Se a nuvem
-      // falhar, preservamos a foto local e colocamos somente a sincronização
-      // na fila, em vez de repetir toda a cadeia de mídia nesta mesma chamada.
-      cloudError = error;
-      blob = (await idbGet('assetPhotos', assetId).catch(() => null))?.blob || null;
-      if (!blob) throw error;
-    }
-
-    const entry = await queueAssetProfilePhoto(assetId, blob);
-    if (entry && navigator.onLine && state.cloudUser?.id && !cloudError) {
-      // A rotina base já concluiu Storage + RPC; não fazemos um segundo upload.
-      await idbDelete('appSettings', entry.key).catch(() => {});
-    }
-    if (cloudError) {
-      console.warn('[Media] Foto principal salva localmente; sincronização pendente:', cloudError);
+  async function saveAssetProfilePhoto(assetId, source) {
+    if (!assetId || !source) return null;
+    const context = { assetId };
+    const blob = await compressValidated(source, 1000, .82, context);
+    // Só substitui o cache depois que o JPEG final foi decodificado e validado.
+    await stage('local-asset-commit', () => idbPut('assetPhotos', {
+      assetId, blob, updatedAt: nowIso(),
+    }), context);
+    const entry = await queueAssetProfile(assetId, blob);
+    if (entry && navigator.onLine && state.cloudUser?.id) {
+      try { await syncAssetEntry(entry); }
+      catch (error) { console.warn('[Media V2] Foto local válida; sincronização ficou pendente.', error); }
     }
     return blob;
-  };
-
-  async function saveAssetProfileBlob(assetId, sourceBlob) {
-    return setAssetPhoto(assetId, sourceBlob);
   }
 
   async function pendingEntries(kind) {
-    const ownerId = currentOwnerId();
-    if (!ownerId) return [];
+    const uid = ownerId();
+    if (!uid) return [];
     const rows = await idbAll('appSettings');
-    return rows.filter(row => row?.kind === kind && row.ownerId === ownerId);
+    return rows.filter(row => row?.kind === kind && row.ownerId === uid);
   }
 
   async function syncPendingAssetProfiles() {
-    if (!navigator.onLine || !state.cloudUser?.id) return { processed: 0 };
-    const rows = await pendingEntries(ASSET_QUEUE_KIND);
+    if (!navigator.onLine || !state.cloudUser?.id) return 0;
     let processed = 0;
-    for (const entry of rows) {
+    for (const entry of await pendingEntries(ASSET_QUEUE_KIND)) {
+      try { if (await syncAssetEntry(entry)) processed += 1; }
+      catch (error) { console.warn('[Media V2] Foto de ativo pendente:', error); }
+    }
+    return processed;
+  }
+
+  const basePhotoForAsset = photoForAsset;
+  photoForAsset = async function safePhotoForAsset(assetId) {
+    const local = await idbGet('assetPhotos', assetId).catch(() => null);
+    if (local?.blob) {
       try {
-        if (await syncAssetProfileEntry(entry)) processed += 1;
+        await validateImageBlob(local.blob);
+        return local.blob;
       } catch (error) {
-        console.warn('[Media] Sincronização de foto principal pendente:', error);
+        console.warn('[Media V2] Cache local inválido removido do ativo:', assetId, error);
+        diagnostic('repair-asset-cache', 'removed', { assetId, message: String(error?.message || error) });
+        await idbDelete('assetPhotos', assetId).catch(() => {});
       }
     }
-    return { processed };
-  }
+    const fallback = await basePhotoForAsset(assetId);
+    if (!fallback) return null;
+    try {
+      await validateImageBlob(fallback);
+      return fallback;
+    } catch (error) {
+      await idbDelete('assetPhotos', assetId).catch(() => {});
+      diagnostic('repair-asset-cache', 'remote-invalid', { assetId, message: String(error?.message || error) });
+      return null;
+    }
+  };
 
-  async function localUserAvatar() {
+  async function localAvatar() {
     if (!state.cloudUser?.id) return null;
-    return (await idbGet('appSettings', `user-avatar:${state.cloudUser.id}`).catch(() => null))?.blob || null;
+    const row = await idbGet('appSettings', `user-avatar:${state.cloudUser.id}`).catch(() => null);
+    if (!row?.blob) return null;
+    try { await validateImageBlob(row.blob); return row.blob; }
+    catch {
+      await idbDelete('appSettings', `user-avatar:${state.cloudUser.id}`).catch(() => {});
+      return null;
+    }
   }
 
-  async function queueUserAvatar(blob, action = 'set', oldPath = null) {
-    const ownerId = currentOwnerId();
-    if (!ownerId) return null;
-    const key = avatarQueueKey(ownerId);
-    const previous = await idbGet('appSettings', key).catch(() => null);
-    const entry = {
-      key,
-      kind: AVATAR_QUEUE_KIND,
-      ownerId,
-      action,
-      blob: action === 'set' ? blob : null,
-      oldPath: oldPath || previous?.oldPath || state.cloudProfile?.avatar_path || null,
-      status: 'pendente',
-      attempts: previous?.attempts || 0,
-      lastError: '',
-      createdAt: previous?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await idbPut('appSettings', entry);
-    return entry;
-  }
-
-  async function syncUserAvatarEntry(entry) {
-    if (!entry || entry.kind !== AVATAR_QUEUE_KIND) return false;
-    if (!navigator.onLine || !state.cloudUser?.id) return false;
+  async function syncAvatarEntry(entry) {
+    if (!entry || entry.kind !== AVATAR_QUEUE_KIND || !navigator.onLine || !state.cloudUser?.id) return false;
     if (entry.ownerId !== state.cloudUser.id) return false;
-
     entry.attempts = (entry.attempts || 0) + 1;
-    entry.updatedAt = new Date().toISOString();
+    entry.updatedAt = nowIso();
     await idbPut('appSettings', entry);
-
     try {
       if (entry.action === 'remove') {
         if (entry.oldPath) {
-          const { error: removeError } = await cloudClient.storage
-            .from('user-profile-photos')
-            .remove([entry.oldPath]);
-          if (removeError) console.warn('[Media] Remoção do arquivo antigo do avatar:', removeError);
+          const { error } = await cloudClient.storage.from('user-profile-photos').remove([entry.oldPath]);
+          if (error) console.warn('[Media V2] Remoção do avatar anterior:', error);
         }
         const { error } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: null });
         if (error) throw error;
         state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: null };
       } else {
         const path = `${state.cloudUser.id}/avatar.jpg`;
-        const { error: uploadError } = await cloudClient.storage
-          .from('user-profile-photos')
+        const { error: uploadError } = await cloudClient.storage.from('user-profile-photos')
           .upload(path, entry.blob, { contentType: 'image/jpeg', upsert: true });
         if (uploadError) throw uploadError;
-        const { error: rpcError } = await cloudClient.rpc('set_own_profile_avatar', {
-          p_storage_path: path,
-        });
+        const { error: rpcError } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: path });
         if (rpcError) throw rpcError;
         state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: path };
       }
-
       storeIdentity(state.cloudUser, state.cloudProfile);
       await idbDelete('appSettings', entry.key);
       return true;
     } catch (error) {
       entry.status = 'erro';
       entry.lastError = String(error?.message || error);
-      entry.updatedAt = new Date().toISOString();
+      entry.updatedAt = nowIso();
       await idbPut('appSettings', entry);
-      throw error;
+      throw mediaError('cloud-avatar', error);
     }
   }
 
-  async function syncPendingUserAvatar() {
-    if (!navigator.onLine || !state.cloudUser?.id) return { processed: 0 };
-    const rows = await pendingEntries(AVATAR_QUEUE_KIND);
-    let processed = 0;
-    for (const entry of rows) {
-      try {
-        if (await syncUserAvatarEntry(entry)) processed += 1;
-      } catch (error) {
-        console.warn('[Media] Sincronização de avatar pendente:', error);
-      }
-    }
-    return { processed };
-  }
-
-  async function saveUserAvatar(file) {
+  async function saveAvatar(source) {
     if (!state.cloudUser?.id) throw new Error('Sessão do usuário indisponível. Entre novamente.');
-    const blob = await compressImage(file, 700, .85);
+    const blob = await compressValidated(source, 700, .85, { kind: 'user-avatar' });
     const path = `${state.cloudUser.id}/avatar.jpg`;
-    await idbPut('appSettings', {
-      key: `user-avatar:${state.cloudUser.id}`,
-      blob,
-      path,
-      updatedAt: new Date().toISOString(),
-    });
+    await stage('local-avatar-commit', () => idbPut('appSettings', {
+      key: `user-avatar:${state.cloudUser.id}`, blob, path, updatedAt: nowIso(),
+    }));
     state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: path };
     storeIdentity(state.cloudUser, state.cloudProfile);
-
-    let synced = false;
-    if (navigator.onLine) {
-      try {
-        const { error: uploadError } = await cloudClient.storage
-          .from('user-profile-photos')
-          .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-        if (uploadError) throw uploadError;
-        const { error: rpcError } = await cloudClient.rpc('set_own_profile_avatar', {
-          p_storage_path: path,
-        });
-        if (rpcError) throw rpcError;
-        synced = true;
-        await idbDelete('appSettings', avatarQueueKey(state.cloudUser.id)).catch(() => {});
-      } catch (error) {
-        console.warn('[Media] Avatar salvo localmente; sincronização pendente:', error);
-      }
+    const entry = await queueAvatar(blob, 'set');
+    if (entry && navigator.onLine) {
+      try { await syncAvatarEntry(entry); }
+      catch (error) { console.warn('[Media V2] Avatar local válido; sincronização pendente.', error); }
     }
-    if (!synced) await queueUserAvatar(blob, 'set');
-
     updateRoleChrome();
     return blob;
   }
 
-  async function removeUserAvatarShared() {
+  async function removeAvatar() {
     if (!state.cloudUser?.id) throw new Error('Sessão do usuário indisponível. Entre novamente.');
-    const ownerId = state.cloudUser.id;
     const oldPath = state.cloudProfile?.avatar_path || null;
-    await idbDelete('appSettings', `user-avatar:${ownerId}`);
+    await idbDelete('appSettings', `user-avatar:${state.cloudUser.id}`);
     state.cloudProfile = { ...(state.cloudProfile || {}), avatar_path: null };
     storeIdentity(state.cloudUser, state.cloudProfile);
-
-    let synced = false;
-    if (navigator.onLine) {
-      try {
-        if (oldPath) {
-          const { error: removeError } = await cloudClient.storage
-            .from('user-profile-photos')
-            .remove([oldPath]);
-          if (removeError) console.warn('[Media] Remoção do arquivo antigo do avatar:', removeError);
-        }
-        const { error } = await cloudClient.rpc('set_own_profile_avatar', { p_storage_path: null });
-        if (error) throw error;
-        synced = true;
-        await idbDelete('appSettings', avatarQueueKey(ownerId)).catch(() => {});
-      } catch (error) {
-        console.warn('[Media] Remoção do avatar pendente de sincronização:', error);
-      }
+    const entry = await queueAvatar(null, 'remove', oldPath);
+    if (entry && navigator.onLine) {
+      try { await syncAvatarEntry(entry); }
+      catch (error) { console.warn('[Media V2] Remoção do avatar pendente.', error); }
     }
-    if (!synced) await queueUserAvatar(null, 'remove', oldPath);
-
     updateRoleChrome();
-    return true;
   }
 
-  // Cache-first: evita que a interface dependa da latência do Storage.
+  async function syncPendingAvatars() {
+    if (!navigator.onLine || !state.cloudUser?.id) return 0;
+    let processed = 0;
+    for (const entry of await pendingEntries(AVATAR_QUEUE_KIND)) {
+      try { if (await syncAvatarEntry(entry)) processed += 1; }
+      catch (error) { console.warn('[Media V2] Avatar pendente:', error); }
+    }
+    return processed;
+  }
+
   const baseCachedUserAvatar = cachedUserAvatar;
-  cachedUserAvatar = async function sharedCachedUserAvatar() {
-    const local = await localUserAvatar();
+  cachedUserAvatar = async function safeCachedUserAvatar() {
+    const local = await localAvatar();
     if (local) return local;
     if (!navigator.onLine) return null;
     try {
-      return await Promise.race([
+      const remote = await Promise.race([
         Promise.resolve(baseCachedUserAvatar()).catch(() => null),
-        new Promise(resolve => setTimeout(() => resolve(null), 700)),
+        new Promise(resolve => setTimeout(() => resolve(null), 900)),
       ]);
-    } catch {
-      return null;
-    }
+      if (!remote) return null;
+      await validateImageBlob(remote);
+      return remote;
+    } catch { return null; }
   };
 
-  async function syncPendingMedia() {
+  async function syncPending() {
     if (!navigator.onLine || !state.cloudUser?.id) return { assetProfiles: 0, avatars: 0 };
-    const [assets, avatars] = await Promise.all([
-      syncPendingAssetProfiles(),
-      syncPendingUserAvatar(),
+    const [assetProfiles, avatars] = await Promise.all([
+      syncPendingAssetProfiles(), syncPendingAvatars(),
     ]);
-    return { assetProfiles: assets.processed, avatars: avatars.processed };
+    return { assetProfiles, avatars };
   }
 
-  async function chooseAssetProfilePhoto(assetId, { afterSave = null, title = 'Foto principal do ativo' } = {}) {
+  async function chooseAssetProfilePhoto(assetId, options = {}) {
     if (!assetId || assetPhotoBusy) return null;
     assetPhotoBusy = true;
+    const context = { kind: 'asset-profile', assetId, ...(options.context || {}) };
     try {
-      const file = await pickImage({
-        title,
-        context: { kind: 'asset-profile', assetId },
-      });
+      const file = await pickImage({ title: options.title || 'Foto principal do ativo', context });
       if (!file) return null;
-      const blob = await setAssetPhoto(assetId, file);
-      if (typeof afterSave === 'function') await afterSave(blob);
+      const blob = await saveAssetProfilePhoto(assetId, file);
+      if (typeof options.afterSave === 'function') await options.afterSave(blob);
       toast(navigator.onLine
         ? 'Foto principal do ativo atualizada.'
         : 'Foto principal salva no dispositivo e aguardando sincronização.',
         navigator.onLine ? 'success' : 'notice');
       return blob;
     } catch (error) {
-      const message = String(error?.message || error);
-      if (!/cancel|cancelado|canceled/i.test(message)) toast(message, 'warning');
+      showMediaError(error);
       return null;
-    } finally {
-      assetPhotoBusy = false;
-    }
+    } finally { assetPhotoBusy = false; }
   }
 
-  // Nome já utilizado pelo formulário principal de manutenção.
-  globalThis.chooseProfilePhoto = async function chooseProfilePhotoShared(assetId) {
+  globalThis.chooseProfilePhoto = async function chooseProfilePhotoV2(assetId) {
     return chooseAssetProfilePhoto(assetId, {
-      afterSave: async () => {
-        if (state.screen === 'activity') await renderActivity();
-      },
+      context: { kind: 'asset-profile', assetId },
+      afterSave: async () => { if (state.screen === 'activity') await renderActivity(); },
     });
   };
 
-  // Quando uma foto da manutenção for marcada como foto principal, usa a mesma fila.
+  // Evita que persistPendingPhotos grave uma foto principal sem validação.
   const basePersistPendingPhotos = persistPendingPhotos;
-  persistPendingPhotos = async function sharedPersistPendingPhotos(recordId, sel, createdAt) {
-    const result = await basePersistPendingPhotos(recordId, sel, createdAt);
-    const profileSelections = (state.pendingPhotos || [])
-      .filter(photo => photo?.asProfile && photo.assetId && photo.assetId !== 'all');
-
-    for (const photo of profileSelections) {
-      try {
-        await saveAssetProfileBlob(photo.assetId, photo.blob);
-      } catch (error) {
-        console.warn('[Media] Foto da manutenção não pôde ser promovida à foto principal:', error);
-      }
+  persistPendingPhotos = async function persistPendingPhotosV2(recordId, sel, createdAt) {
+    const selected = (state.pendingPhotos || [])
+      .filter(photo => photo?.asProfile && photo.assetId && photo.assetId !== 'all')
+      .map(photo => ({ photo, assetId: photo.assetId }));
+    const originalFlags = (state.pendingPhotos || []).map(photo => Boolean(photo.asProfile));
+    for (const photo of state.pendingPhotos || []) photo.asProfile = false;
+    let result;
+    try { result = await basePersistPendingPhotos(recordId, sel, createdAt); }
+    finally { (state.pendingPhotos || []).forEach((photo, i) => { photo.asProfile = originalFlags[i] || false; }); }
+    for (const item of selected) {
+      try { await saveAssetProfilePhoto(item.assetId, item.photo.blob); }
+      catch (error) { console.warn('[Media V2] Promoção de foto da manutenção:', error); }
     }
     return result;
   };
 
-  function attachAssetDatabasePhotoAction(subId, assetId) {
+  function bindActivityMedia() {
+    document.querySelectorAll('[data-profile-photo]').forEach(button => {
+      button.onclick = () => chooseAssetProfilePhoto(button.dataset.profilePhoto, {
+        context: { kind: 'asset-profile', assetId: button.dataset.profilePhoto },
+        afterSave: async () => { if (state.screen === 'activity') await renderActivity(); },
+      });
+    });
+    const button = document.getElementById('pick-photos');
+    if (button) {
+      button.onclick = async event => {
+        event.preventDefault();
+        try {
+          const files = await pickImages({
+            multiple: true,
+            title: 'Adicionar fotos',
+            context: { kind: 'maintenance-photos' },
+          });
+          if (files?.length) await addPendingPhotos(files);
+        } catch (error) { showMediaError(error); }
+      };
+    }
+  }
+
+  const baseRenderActivity = renderActivity;
+  renderActivity = async function renderActivityV2(...args) {
+    const result = await baseRenderActivity.apply(this, args);
+    bindActivityMedia();
+    return result;
+  };
+
+  function attachAssetAction(subId, assetId) {
     if (state.role !== 'admin') return;
     const modal = document.getElementById('asset-modal');
-    const photo = modal?.querySelector('.asset-modal-photo');
-    if (!photo || photo.querySelector('.central-media-asset-action')) return;
-
-    photo.classList.add('central-media-photo-host');
+    const photoHost = modal?.querySelector('.asset-modal-photo');
+    if (!photoHost || photoHost.querySelector('.central-media-asset-action')) return;
+    photoHost.classList.add('central-media-photo-host');
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'central-media-asset-action';
     button.innerHTML = '<span data-icon="camera"></span><span>Adicionar / alterar foto</span>';
-    photo.appendChild(button);
+    photoHost.appendChild(button);
     hydrateIcons(button);
-
-    /*
-     * A foto é uma mídia independente dos campos cadastrais. Por isso ela pode
-     * ser alterada mesmo com o formulário textual bloqueado e também offline;
-     * a fila compartilhada fará a sincronização quando a conexão voltar.
-     */
-
-    button.addEventListener('click', async event => {
+    button.onclick = async event => {
       event.preventDefault();
       event.stopPropagation();
       await chooseAssetProfilePhoto(assetId, {
         title: 'Foto do ativo',
+        context: { kind: 'asset-profile', assetId, subId },
         afterSave: async () => {
-          await openAssetDetails(subId, assetId);
-          // A foto acabou de ser salva; reabre a ficha em modo de leitura por segurança.
+          // Chama a implementação base diretamente para não reentrar no wrapper.
+          await baseOpenAssetDetails(subId, assetId);
+          attachAssetAction(subId, assetId);
         },
       });
-    });
+    };
   }
 
   const baseOpenAssetDetails = openAssetDetails;
-  openAssetDetails = async function sharedOpenAssetDetails(subId, assetId) {
-    const result = await baseOpenAssetDetails(subId, assetId);
-    attachAssetDatabasePhotoAction(subId, assetId);
-    return result;
+  openAssetDetails = async function openAssetDetailsV2(subId, assetId) {
+    try {
+      const result = await baseOpenAssetDetails(subId, assetId);
+      attachAssetAction(subId, assetId);
+      return result;
+    } catch (error) {
+      console.error('[Media V2] Abertura de ativo:', assetId, error);
+      throw error;
+    }
   };
 
   function profileIdentity() {
@@ -522,76 +521,47 @@
     const email = state.cloudUser?.email || '';
     const rawName = (p.display_name || '').trim();
     const primaryName = rawName && rawName.toLowerCase() !== email.toLowerCase() && !rawName.includes('@')
-      ? rawName
-      : (email || 'Usuário');
+      ? rawName : (email || 'Usuário');
     const secondary = primaryName === email ? u.label : `${email}${email ? ' · ' : ''}${u.label}`;
-    return { u, p, email, primaryName, secondary };
+    return { u, p, primaryName, secondary };
   }
 
-  async function openSharedProfilePhotoDialog() {
+  async function openProfilePhotoDialogV2() {
     const u = currentUser();
     const root = document.getElementById('modal-root');
     if (!root) return;
-    const local = await localUserAvatar();
-
-    root.innerHTML = `<div class="modal" id="profile-photo-modal"><div class="modal-card profile-photo-dialog"><button class="modal-close" id="close-profile-photo" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Foto do perfil</h2><p class="muted">No celular você pode tirar uma foto ou escolher da galeria. No computador, selecione uma imagem salva no dispositivo.</p><div class="profile-photo-preview" id="profile-photo-preview">${local ? `<img src="${blobUrl(local)}" alt="Foto atual">` : esc(u.initials)}</div><div class="profile-photo-actions"><button class="btn secondary" id="choose-profile-photo" type="button"><span data-icon="camera"></span>${local ? 'Alterar foto' : 'Adicionar foto'}</button>${(local || state.cloudProfile?.avatar_path) ? '<button class="btn ghost" id="remove-profile-photo" type="button"><span data-icon="trash"></span>Remover foto</button>' : ''}</div></div></div>`;
+    const local = await localAvatar();
+    root.innerHTML = `<div class="modal" id="profile-photo-modal"><div class="modal-card profile-photo-dialog"><button class="modal-close" id="close-profile-photo" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Foto do perfil</h2><p class="muted">No celular, escolha câmera ou galeria. No computador, selecione uma imagem do dispositivo.</p><div class="profile-photo-preview" id="profile-photo-preview">${local ? `<img src="${blobUrl(local)}" alt="Foto atual">` : esc(u.initials)}</div><div class="profile-photo-actions"><button class="btn secondary" id="choose-profile-photo" type="button"><span data-icon="camera"></span>${local ? 'Alterar foto' : 'Adicionar foto'}</button>${(local || state.cloudProfile?.avatar_path) ? '<button class="btn ghost" id="remove-profile-photo" type="button"><span data-icon="trash"></span>Remover foto</button>' : ''}</div></div></div>`;
     hydrateIcons(root);
-
     const close = () => { root.innerHTML = ''; };
     document.getElementById('close-profile-photo').onclick = close;
-    document.getElementById('profile-photo-modal').onclick = event => {
-      if (event.target === event.currentTarget) event.stopPropagation();
-    };
-
+    document.getElementById('profile-photo-modal').onclick = event => { if (event.target === event.currentTarget) event.stopPropagation(); };
     document.getElementById('choose-profile-photo').onclick = async () => {
       try {
-        const file = await pickImage({
-          title: 'Foto do perfil',
-          context: { kind: 'user-avatar' },
-        });
+        const file = await pickImage({ title: 'Foto do perfil', context: { kind: 'user-avatar' } });
         if (!file) return;
-        await saveUserAvatar(file);
+        await saveAvatar(file);
         close();
-        toast(navigator.onLine
-          ? 'Foto do perfil atualizada.'
-          : 'Foto salva no dispositivo e aguardando sincronização.',
-          navigator.onLine ? 'success' : 'notice');
-      } catch (error) {
-        toast(error?.message || String(error), 'warning');
-      }
+        toast(navigator.onLine ? 'Foto do perfil atualizada.' : 'Foto salva localmente e aguardando sincronização.', navigator.onLine ? 'success' : 'notice');
+      } catch (error) { showMediaError(error); }
     };
-
     document.getElementById('remove-profile-photo')?.addEventListener('click', async () => {
       if (!confirm('Remover a foto do perfil?')) return;
-      try {
-        await removeUserAvatarShared();
-        close();
-        toast(navigator.onLine
-          ? 'Foto do perfil removida.'
-          : 'Remoção salva no dispositivo e aguardando sincronização.',
-          navigator.onLine ? 'success' : 'notice');
-      } catch (error) {
-        toast(error?.message || String(error), 'warning');
-      }
+      try { await removeAvatar(); close(); toast('Foto do perfil removida.'); }
+      catch (error) { showMediaError(error); }
     });
   }
 
-  async function openSharedMyProfileDialog() {
+  async function openMyProfileDialogV2() {
     const { u, p, primaryName, secondary } = profileIdentity();
     const root = document.getElementById('modal-root');
     if (!root) return;
-
-    // Renderiza primeiro. Nenhum acesso ao Storage antecede a abertura do container.
     root.innerHTML = `<div class="modal" id="my-profile-modal"><div class="modal-card profile-settings-dialog has-sticky-close"><button class="modal-close profile-standard-close" id="close-my-profile" type="button" aria-label="Fechar"><span data-icon="x"></span></button><div class="whatsapp-profile-card"><div class="whatsapp-profile-head"><button class="whatsapp-profile-avatar profile-avatar-edit" id="profile-avatar-edit" type="button" aria-label="Alterar foto do perfil" title="Alterar foto do perfil">${esc(u.initials)}<span class="profile-avatar-camera" data-icon="camera"></span></button><div class="profile-identity"><strong>${esc(primaryName)}</strong><small>${esc(secondary)}</small></div></div><form id="my-profile-form" class="auth-form"><div class="auth-field"><label>Telefone / WhatsApp de contato</label><input name="whatsapp_number" type="tel" inputmode="tel" autocomplete="tel" required placeholder="(32) 99999-9999" value="${esc(p.whatsapp_number || '')}"></div><div><label class="profile-section-label">Preferências de notificações</label>${notificationPreferencesMarkup(p, state.role)}</div><div class="push-device-card refined-push-device"><div><strong>Este dispositivo</strong><small class="push-device-intro">Gerencie as notificações deste computador ou celular.</small></div><button class="btn secondary push-device-toggle" id="push-device-toggle" type="button">Verificando…</button><p class="push-help" id="push-device-help"></p></div><div class="profile-save-row"><button class="btn primary" type="submit">Salvar preferências</button></div></form></div></div></div>`;
     hydrateIcons(root);
-
     const close = () => { root.innerHTML = ''; };
     document.getElementById('close-my-profile').onclick = close;
-    document.getElementById('my-profile-modal').onclick = event => {
-      if (event.target === event.currentTarget) event.stopPropagation();
-    };
-    document.getElementById('profile-avatar-edit').onclick = () => openSharedProfilePhotoDialog();
-
+    document.getElementById('my-profile-modal').onclick = event => { if (event.target === event.currentTarget) event.stopPropagation(); };
+    document.getElementById('profile-avatar-edit').onclick = () => openProfilePhotoDialogV2();
     const pushButton = document.getElementById('push-device-toggle');
     pushButton.onclick = async event => {
       const button = event.currentTarget;
@@ -599,20 +569,11 @@
       button.disabled = true;
       button.textContent = active ? 'Desativando…' : 'Ativando…';
       try {
-        if (active) {
-          await deactivatePushOnThisDevice();
-          toast('Notificações desativadas neste dispositivo.');
-        } else {
-          await activatePushOnThisDevice();
-          toast('Notificações ativadas neste dispositivo.');
-        }
-      } catch (error) {
-        toast(error?.message || String(error), 'warning');
-      } finally {
-        Promise.resolve().then(() => refreshPushDeviceCard()).catch(() => {});
-      }
+        if (active) { await deactivatePushOnThisDevice(); toast('Notificações desativadas neste dispositivo.'); }
+        else { await activatePushOnThisDevice(); toast('Notificações ativadas neste dispositivo.'); }
+      } catch (error) { toast(error?.message || String(error), 'warning'); }
+      finally { Promise.resolve().then(() => refreshPushDeviceCard()).catch(() => {}); }
     };
-
     const form = document.getElementById('my-profile-form');
     form.onsubmit = async event => {
       event.preventDefault();
@@ -638,15 +599,10 @@
         close();
         await updateNotificationBell();
         toast('Contato e notificações atualizados.');
-      } catch (error) {
-        toast(error?.message || String(error), 'warning');
-      } finally {
-        setAuthBusy(form, false);
-      }
+      } catch (error) { toast(error?.message || String(error), 'warning'); }
+      finally { setAuthBusy(form, false); }
     };
-
-    // Imagem e estado do Push são preenchidos depois que o modal já está visível.
-    localUserAvatar().then(blob => {
+    localAvatar().then(blob => {
       if (!blob) return;
       const avatar = document.getElementById('profile-avatar-edit');
       if (!avatar) return;
@@ -656,87 +612,71 @@
     Promise.resolve().then(() => refreshPushDeviceCard()).catch(() => {});
   }
 
-  openProfilePhotoDialog = openSharedProfilePhotoDialog;
-  openMyProfileDialog = openSharedMyProfileDialog;
+  openProfilePhotoDialog = openProfilePhotoDialogV2;
+  openMyProfileDialog = openMyProfileDialogV2;
 
-  // O botão principal de imagens passa pela mesma API compartilhada em todas
-  // as plataformas. No Android isso evita depender do clique programático no
-  // input escondido; no Windows/PWA o seletor continua sendo o do sistema.
-  document.addEventListener('click', event => {
-    const button = event.target instanceof Element
-      ? event.target.closest('#pick-photos')
-      : null;
-    if (!button) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    pickImages({ multiple: true, title: 'Adicionar fotos' })
-      .then(files => files?.length ? addPendingPhotos(files) : null)
-      .catch(error => {
-        const message = String(error?.message || error);
-        if (!/cancel|cancelado|canceled/i.test(message)) toast(message, 'warning');
-      });
-  }, true);
-
-  // Garante o novo opener mesmo se algum listener antigo tiver capturado a função anterior.
-  document.addEventListener('click', event => {
-    const target = event.target instanceof Element
-      ? event.target.closest('#user-avatar,#mobile-profile-photo')
-      : null;
-    if (!target) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (target.id === 'mobile-profile-photo') {
-      try { closeMobileMoreMenu(); } catch {}
-    }
-    openSharedMyProfileDialog().catch(error => {
-      console.error('[Media] Perfil:', error);
-      toast(error?.message || String(error), 'warning');
-    });
-  }, true);
+  // O avatar desktop tinha um addEventListener com a função antiga capturada.
+  // Clonamos uma única vez para remover somente esse listener legado.
+  function installDesktopProfileOpener() {
+    const old = document.getElementById('user-avatar');
+    if (!old || old.dataset.centralMediaV2 === '1') return;
+    const clone = old.cloneNode(true);
+    clone.dataset.centralMediaV2 = '1';
+    old.replaceWith(clone);
+    clone.addEventListener('click', () => openMyProfileDialogV2());
+  }
 
   const baseEnterApplication = enterApplication;
-  enterApplication = async function sharedMediaEnterApplication(...args) {
+  enterApplication = async function enterApplicationV2(...args) {
     const result = await baseEnterApplication.apply(this, args);
-    if (state.cloudUser?.id && navigator.onLine) {
-      setTimeout(() => syncPendingMedia().catch(() => {}), 600);
-    }
+    installDesktopProfileOpener();
+    if (state.cloudUser?.id && navigator.onLine) setTimeout(() => syncPending().catch(() => {}), 700);
     return result;
   };
 
   window.addEventListener('online', () => {
-    if (state.cloudUser?.id) setTimeout(() => syncPendingMedia().catch(() => {}), 700);
+    if (state.cloudUser?.id) setTimeout(() => syncPending().catch(() => {}), 800);
   });
 
-  // Android pode recriar a Activity enquanto câmera/galeria estão abertas.
-  // A bridge nativa devolve o arquivo por este evento quando isso acontece.
   window.addEventListener('central-native-images-restored', async event => {
     const files = event.detail?.files || [];
     const context = event.detail?.context || {};
-    const file = files[0];
-    if (!file) return;
     try {
+      if (context.kind === 'maintenance-photos') {
+        if (files.length) await addPendingPhotos(files);
+        return;
+      }
+      const file = files[0];
+      if (!file) return;
       if (context.kind === 'user-avatar') {
-        await saveUserAvatar(file);
+        await saveAvatar(file);
         toast('Foto do perfil atualizada.');
         return;
       }
       if (context.kind === 'asset-profile' && context.assetId) {
-        await setAssetPhoto(context.assetId, file);
+        await saveAssetProfilePhoto(context.assetId, file);
         if (context.subId && document.getElementById('asset-modal')) {
-          await openAssetDetails(context.subId, context.assetId);
+          await baseOpenAssetDetails(context.subId, context.assetId);
+          attachAssetAction(context.subId, context.assetId);
         } else if (state.screen === 'activity') {
           await renderActivity();
         }
         toast('Foto principal do ativo atualizada.');
       }
-    } catch (error) {
-      console.warn('[Media] Resultado restaurado da câmera:', error);
-      toast(error?.message || String(error), 'warning');
-    }
+    } catch (error) { showMediaError(error); }
+  });
+
+  globalThis.CentralMedia = Object.freeze({
+    version: '2.0.0',
+    pickImages,
+    pickImage,
+    saveAssetProfilePhoto,
+    saveAvatar,
+    syncPending,
+    getDiagnostics: () => diagnostics.slice(),
   });
 
   mediaCss();
-  if (state.cloudUser?.id && navigator.onLine) {
-    setTimeout(() => syncPendingMedia().catch(() => {}), 900);
-  }
+  installDesktopProfileOpener();
+  if (state.cloudUser?.id && navigator.onLine) setTimeout(() => syncPending().catch(() => {}), 1000);
 })();
