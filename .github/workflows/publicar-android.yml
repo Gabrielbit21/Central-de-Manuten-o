@@ -271,7 +271,7 @@ jobs:
 
           badging="$RUNNER_TEMP/android-badging.txt"
           "$aapt" dump badging "$final" | tee "$badging"
-          grep -F "package: name='io.github.gabrielbit21.centralmanutencaose' versionCode='$ANDROID_VERSION_CODE' versionName='$APP_VERSION'" "$badging"
+          grep -F "package: name='io.github.gabrielbit21.centralmanutencaose.android' versionCode='$ANDROID_VERSION_CODE' versionName='$APP_VERSION'" "$badging"
           grep -F "application-label:'Central de Manutenção SE'" "$badging"
 
           sha256sum "$final" | sed "s#  $dist/#  #" > "$dist/SHA256.txt"
@@ -280,7 +280,7 @@ jobs:
           {
             "appVersion": "$APP_VERSION",
             "androidVersionCode": $ANDROID_VERSION_CODE,
-            "applicationId": "io.github.gabrielbit21.centralmanutencaose",
+            "applicationId": "io.github.gabrielbit21.centralmanutencaose.android",
             "appName": "Central de Manutenção SE",
             "sourceCommit": "$GITHUB_SHA",
             "repository": "$GITHUB_REPOSITORY",
@@ -298,7 +298,7 @@ jobs:
           Central_Manutencao_SE_Android_v$APP_VERSION.apk
 
           Identidade do aplicativo:
-          io.github.gabrielbit21.centralmanutencaose
+          io.github.gabrielbit21.centralmanutencaose.android
 
           O APK foi compilado em modo Release, alinhado com zipalign, assinado com a chave privada oficial do projeto e validado com apksigner.
           O ícone do aplicativo usa a identidade Energisa versionada em assets/icons/app-icon-source.png.
