@@ -33,7 +33,7 @@ if (versionCode <= 0 || versionCode > 2_100_000_000) {
 }
 
 const capacitorConfig = JSON.parse(readFileSync(capacitorConfigPath, 'utf8'));
-if (capacitorConfig.appId !== 'io.github.gabrielbit21.centralmanutencaose') {
+if (capacitorConfig.appId !== 'io.github.gabrielbit21.centralmanutencaose.android') {
   throw new Error(`appId Android inesperado: ${capacitorConfig.appId}`);
 }
 if (capacitorConfig.appName !== 'Central de Manutenção SE') {
