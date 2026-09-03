@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.2'}};
-const APP_VERSION='1.9.2';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.3'}};
+const APP_VERSION='1.9.3';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -661,7 +661,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.2.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.3.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1705,8 +1705,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.2';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.2';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.3';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='1.9.3';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1787,7 +1787,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.2';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.3';
 };
 
 
@@ -1875,7 +1875,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.2';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.2'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.3';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.3'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -1967,8 +1967,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.2';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.2';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.3';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.3';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -2001,6 +2001,231 @@ openMyProfileDialog=async function(){
   await _v180OpenProfile();
   const close=document.getElementById('close-my-profile');if(close){close.classList.add('profile-standard-close');close.setAttribute('aria-label','Fechar')}
   hydrateIcons(document.getElementById('modal-root'));
+};
+/* ===== v1.9.3 — homologação operacional ===== */
+
+// 1) Integração / substituição: fluxo exclusivamente operacional (sem modo de teste).
+const _v193RenderAssetOperationsHome=renderAssetOperationsHome;
+renderAssetOperationsHome=async function(){
+  await _v193RenderAssetOperationsHome();
+  document.getElementById('purge-test-operations')?.remove();
+  const heroText=main.querySelector('.operation-hero .muted');
+  if(heroText)heroText.textContent='As operações registradas atualizam o cadastro principal de ativos após a sincronização com a nuvem.';
+};
+
+const _v193RenderAssetOperationForm=renderAssetOperationForm;
+renderAssetOperationForm=function(type){
+  _v193RenderAssetOperationForm(type);
+  const form=document.getElementById('asset-operation-form');
+  const testInput=form?.elements?.isTest;
+  if(testInput){
+    testInput.checked=false;
+    testInput.closest('.field.full')?.classList.add('hidden');
+  }
+};
+
+const _v193ReviewAssetOperation=reviewAssetOperation;
+reviewAssetOperation=function(e,type,form){
+  if(form?.elements?.isTest)form.elements.isTest.checked=false;
+  _v193ReviewAssetOperation(e,type,form);
+  document.querySelectorAll('#operation-review-modal .operation-review-item').forEach(item=>{
+    if(item.querySelector('b')?.textContent?.trim()==='Modo')item.remove();
+  });
+};
+
+const _v193SaveAssetOperation=saveAssetOperation;
+saveAssetOperation=async function(...args){
+  await _v193SaveAssetOperation(...args);
+  if(navigator.onLine&&state.cloudUser){
+    try{await loadCloudSnapshot()}catch(error){console.warn('Atualização pós-operação de ativo:',error)}
+  }
+};
+
+// 2) Nova manutenção: separação entre peça retirada e peça nova instalada.
+FORM_LABELS.peca='Peça retirada';
+FORM_LABELS.pecaNovaCodigo='Código da peça nova';
+FORM_LABELS.pecaNovaDescricao='Descrição da peça nova';
+FORM_LABELS.pecaNovaSerie='Número de série da peça nova';
+
+const _v193RenderActivity=renderActivity;
+renderActivity=async function(){
+  await _v193RenderActivity();
+  if(state.screen!=='activity')return;
+  const section=document.getElementById('piece-fields'),form=document.getElementById('form');
+  if(!section||!form)return;
+
+  const previous={
+    peca:form.elements.peca?.value||'',
+    destinoPeca:form.elements.destinoPeca?.value||''
+  };
+
+  section.innerHTML=`<div class="dynamic-section-head"><div><h3>Peças da substituição</h3><p>Registre separadamente o material retirado e a peça nova instalada.</p></div><span class="smart-form-hint">Preenchimento obrigatório</span></div>
+    <div class="piece-subsection">
+      <h4>Peça retirada</h4>
+      <div class="form-grid">
+        <div class="field"><label>${requiredLabel('Peça retirada')}</label><input name="peca" data-required-when-visible="true" placeholder="Código, descrição e série da peça retirada"></div>
+        <div class="field"><label>${requiredLabel('Destino da peça retirada')}</label><select name="destinoPeca" data-required-when-visible="true"><option value="">Selecione</option><option>Estoque</option><option>Enviada para reparo</option><option>Descarte</option><option>Permaneceu no local</option><option>Outro</option></select></div>
+      </div>
+    </div>
+    <div class="piece-subsection new-part-subsection">
+      <h4>Peça nova instalada</h4>
+      <div class="form-grid">
+        <div class="field"><label>Código da peça nova</label><input name="pecaNovaCodigo" placeholder="Código ou part number"></div>
+        <div class="field"><label>${requiredLabel('Descrição da peça nova')}</label><input name="pecaNovaDescricao" data-required-when-visible="true" placeholder="Descrição da peça instalada"></div>
+        <div class="field"><label>Número de série da peça nova</label><input name="pecaNovaSerie" placeholder="Número de série, quando aplicável"></div>
+      </div>
+    </div>`;
+
+  form.elements.peca.value=previous.peca;
+  form.elements.destinoPeca.value=previous.destinoPeca;
+
+  let restored={};
+  try{
+    const draftId=state.activeDraftId||'current';
+    const draft=await idbGet('drafts',draftId);
+    restored=draft?.form||state.editingOriginal?.form||{};
+  }catch(_){restored=state.editingOriginal?.form||{}}
+  updatePieceFields(form,restored);
+};
+
+// Mantém a tabela estruturada de peças sincronizada, inclusive em correções.
+const _v193EnsureReportChildren=ensureReportChildren;
+ensureReportChildren=async function(record,user){
+  await _v193EnsureReportChildren(record,user);
+  if(normalize(record.form?.houvePeca)!=='sim'||!record.partCloudId)return;
+  const {error}=await cloudClient.from('maintenance_parts').update({
+    description:record.form?.peca||'',
+    removed_destination:record.form?.destinoPeca||null,
+    installed_part_code:record.form?.pecaNovaCodigo||null,
+    installed_part_description:record.form?.pecaNovaDescricao||null,
+    installed_part_serial_number:record.form?.pecaNovaSerie||null
+  }).eq('id',record.partCloudId);
+  if(error)throw error;
+};
+
+const _v193OpenReportDetails=openReportDetails;
+openReportDetails=async function(key){
+  await _v193OpenReportDetails(key);
+  const report=state.reports.find(r=>r.key===key)||(await combinedReports()).find(r=>r.key===key);
+  if(!report||report.source==='imported')return;
+  const form=report.raw?.form||{};
+  const card=document.querySelector('#report-modal .report-modal-card');
+  if(!card)return;
+
+  const pieceBlock=[...card.querySelectorAll('.detail-block')].find(block=>block.querySelector('h3')?.textContent?.trim()==='Peça substituída');
+  if(pieceBlock)pieceBlock.querySelector('h3').textContent='Peça retirada';
+
+  const newPartValues=[
+    ['Código',form.pecaNovaCodigo],
+    ['Descrição',form.pecaNovaDescricao],
+    ['Número de série',form.pecaNovaSerie]
+  ].filter(([,value])=>String(value||'').trim());
+
+  if(pieceBlock&&newPartValues.length){
+    pieceBlock.insertAdjacentHTML('afterend',`<div class="detail-block"><h3>Peça nova instalada</h3>${newPartValues.map(([label,value])=>`<p><b>${esc(label)}:</b> ${esc(value)}</p>`).join('')}</div>`);
+  }
+};
+
+const _v193StandardMaintenanceExportRow=standardMaintenanceExportRow;
+standardMaintenanceExportRow=function(report){
+  const row=_v193StandardMaintenanceExportRow(report),form=report?.raw?.form||report?.raw||{};
+  return {
+    ...row,
+    PECA_RETIRADA:row.PECA_SUBSTITUIDA||'',
+    PECA_NOVA_CODIGO:exportSafeText(form.pecaNovaCodigo),
+    PECA_NOVA_DESCRICAO:exportSafeText(form.pecaNovaDescricao),
+    PECA_NOVA_NUMERO_SERIE:exportSafeText(form.pecaNovaSerie)
+  };
+};
+
+// 3) Central de notificações: listar somente notificações ainda não visualizadas.
+ownNotifications=async function(limit=80){
+  if(!state.cloudUser||!navigator.onLine)return [];
+  const {data,error}=await cloudClient
+    .from('notification_outbox')
+    .select('id,event_type,report_id,report_revision,payload,status,read_at,created_at,last_error')
+    .is('read_at',null)
+    .order('created_at',{ascending:false})
+    .limit(limit);
+  if(error)throw error;
+  return data||[];
+};
+
+const _v193OpenNotificationCenter=openNotificationCenter;
+openNotificationCenter=async function(){
+  await _v193OpenNotificationCenter();
+  const subtitle=document.querySelector('.notification-center-head .muted');
+  if(subtitle)subtitle.textContent='Somente atualizações ainda não visualizadas.';
+  const empty=document.querySelector('.notification-empty strong');
+  if(empty&&empty.textContent.includes('Nenhuma notificação'))empty.textContent='Nenhuma notificação nova.';
+};
+
+// 4) Equipe de Campo: painel de todos os relatórios do usuário, com status e detalhes.
+function ensureV193Styles(){
+  if(document.getElementById('v193-homologation-styles'))return;
+  const style=document.createElement('style');
+  style.id='v193-homologation-styles';
+  style.textContent=`
+    .piece-subsection{grid-column:1/-1;border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
+    .piece-subsection h4{margin:0 0 12px;color:var(--blue-dark);font-size:13px}
+    .new-part-subsection{background:#f8fcfd;border-color:#cfe7ed}
+    .my-reports-section{margin-top:18px}
+    .my-reports-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}
+    .my-reports-head h2{margin:0;font-size:18px}
+    .my-reports-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+    .my-reports-count{font-size:11px;font-weight:850;color:var(--blue-dark);background:var(--blue-soft);border:1px solid #cce8ef;border-radius:999px;padding:5px 9px;white-space:nowrap}
+    .my-reports-list{display:grid;gap:9px;max-height:560px;overflow:auto;padding-right:3px}
+    .my-report-item{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px 14px;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;color:inherit}
+    .my-report-item:hover{border-color:#8acddd;background:#fbfdfe}
+    .my-report-main{min-width:0;display:grid;gap:4px}
+    .my-report-main strong{font-size:12px;color:var(--ink);overflow-wrap:anywhere}
+    .my-report-main span{font-size:12px;color:#425b66;overflow-wrap:anywhere}
+    .my-report-main small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+    .my-report-meta{display:grid;justify-items:end;gap:6px;white-space:nowrap}
+    .my-report-meta time{font-size:10px;color:var(--muted)}
+    @media(max-width:700px){
+      .piece-subsection .form-grid{grid-template-columns:1fr}
+      .my-report-item{grid-template-columns:1fr;gap:9px}
+      .my-report-meta{justify-items:start}
+      .my-reports-head{align-items:flex-start}
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function injectMyReportsOnHome(){
+  if(state.role!=='field'||!state.cloudUser)return;
+  document.querySelector('.my-reports-section')?.remove();
+  document.querySelector('.recent-local')?.remove();
+  const anchor=document.querySelector('.action-section');
+  if(!anchor)return;
+
+  const all=await combinedReports(),uid=state.cloudUser.id;
+  const own=all.filter(report=>report.source!=='imported'&&(
+    report.raw?.usuario?.id===uid||
+    report.raw?.authorId===uid||
+    report.raw?.author_id===uid||
+    belongsToCurrentUser(report.raw)
+  ));
+
+  const section=document.createElement('section');
+  section.className='panel my-reports-section';
+  section.innerHTML=`<div class="my-reports-head"><div><h2>Meus Relatórios</h2><p>Consulte os atendimentos enviados por você e acompanhe o status de cada relatório.</p></div><span class="my-reports-count">${own.length} relatório(s)</span></div>
+    <div class="my-reports-list">${own.length?own.map(report=>`<button class="my-report-item" type="button" data-my-report-key="${esc(report.key)}"><span class="my-report-main"><strong>${esc(report.number||'Relatório')}</strong><span>${esc(report.type)} · ${esc(report.substation)}</span><small>${esc(report.assets.join(', ')||'Ativo não informado')}</small></span><span class="my-report-meta">${statusPill(report.status)}<time>${esc(formatDate(report.date))}</time></span></button>`).join(''):'<div class="empty">Você ainda não possui relatórios registrados.</div>'}</div>`;
+
+  anchor.insertAdjacentElement('afterend',section);
+  section.querySelectorAll('[data-my-report-key]').forEach(button=>button.onclick=async()=>{
+    state.reports=await combinedReports();
+    await openReportDetails(button.dataset.myReportKey);
+  });
+}
+
+const _v193RenderHome=renderHome;
+renderHome=async function(){
+  await _v193RenderHome();
+  ensureV193Styles();
+  await injectMyReportsOnHome();
+  requestAnimationFrame(syncAdaptiveHeader);
 };
 
 (async()=>{
