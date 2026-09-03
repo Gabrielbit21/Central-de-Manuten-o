@@ -2227,6 +2227,305 @@ renderHome=async function(){
   await injectMyReportsOnHome();
   requestAnimationFrame(syncAdaptiveHeader);
 };
+/* ===== v1.9.4 — refinamentos visuais e de hierarquia ===== */
+
+// Escopo desta versão: somente apresentação/navegação de interface.
+// Não altera schema, persistência, sincronização, regras de aprovação ou fluxo de manutenção.
+
+function ensureV194Styles(){
+  if(document.getElementById('v194-visual-styles'))return;
+  const style=document.createElement('style');
+  style.id='v194-visual-styles';
+  style.textContent=`
+    /* Item 6 — peças: um único bloco principal, sem caixas aninhadas */
+    #piece-fields.piece-section{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:16px 18px;
+      box-shadow:none;
+    }
+    #piece-fields .dynamic-section-head{padding-bottom:13px}
+    #piece-fields .piece-subsection{
+      grid-column:1/-1;
+      border:0!important;
+      border-radius:0!important;
+      padding:15px 0 2px!important;
+      background:transparent!important;
+      box-shadow:none!important;
+    }
+    #piece-fields .piece-subsection h4{
+      margin:0 0 12px;
+      color:var(--ink);
+      font-size:13px;
+      font-weight:850;
+    }
+    #piece-fields .piece-subsection + .piece-subsection{
+      margin-top:10px;
+      padding-top:18px!important;
+      border-top:1px solid #e7edf0!important;
+    }
+
+    /* Item 7 — link de criação de conta discreto e realmente clicável */
+    .auth-managed-access .auth-inline-link{
+      appearance:none;
+      border:0;
+      background:transparent;
+      padding:0;
+      color:var(--blue-dark);
+      font:inherit;
+      font-weight:850;
+      text-decoration:underline;
+      text-underline-offset:3px;
+      cursor:pointer;
+    }
+    .auth-managed-access .auth-inline-link:hover{color:var(--orange-dark)}
+
+    /* Item 8 — saudação plana, sem gradiente, sem card decorativo */
+    .home-hero{margin-bottom:0}
+    .welcome-card.v194-welcome{
+      width:100%;
+      min-height:0;
+      padding:4px 0 18px;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      overflow:visible;
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:28px;
+    }
+    .welcome-card.v194-welcome:after{display:none!important}
+    .v194-greeting-copy{min-width:0}
+    .welcome-card.v194-welcome h1{
+      margin:0 0 6px;
+      font-size:28px;
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+    .welcome-card.v194-welcome .v194-greeting-sub{
+      margin:0;
+      max-width:700px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+    .v194-home-metrics{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:0;
+      flex-wrap:wrap;
+    }
+    .v194-home-metric{
+      appearance:none;
+      border:0;
+      border-left:1px solid var(--line);
+      background:transparent;
+      color:inherit;
+      padding:2px 16px;
+      text-align:left;
+      min-width:128px;
+      cursor:pointer;
+    }
+    .v194-home-metric:first-child{border-left:0}
+    .v194-home-metric strong{
+      display:block;
+      font-size:19px;
+      line-height:1.05;
+      color:var(--ink);
+      margin-bottom:4px;
+    }
+    .v194-home-metric span{
+      display:block;
+      color:var(--muted);
+      font-size:10px;
+      line-height:1.25;
+      white-space:nowrap;
+    }
+    .v194-home-metric:hover strong{color:var(--blue-dark)}
+    .v194-home-metric:focus-visible{outline:3px solid rgba(0,143,179,.14);outline-offset:2px;border-radius:8px}
+
+    /* Avatar do cabeçalho sem aro/borda decorativa */
+    .user-avatar,
+    .user-avatar:hover,
+    .user-avatar:focus{
+      border:0!important;
+      box-shadow:none!important;
+    }
+    .user-avatar:focus-visible{outline:3px solid rgba(0,143,179,.16);outline-offset:2px}
+
+    /* Item 9 — ação de Usuários usa a mesma linguagem dos demais atalhos */
+    .home-action.users .action-icon{background:#f3f1fb;color:#6251a4}
+    .home-action.users .action-link{color:#6251a4}
+
+    /* Item 5 — código do relatório passa a ser metadado secundário */
+    .my-report-main strong{font-size:13px!important;line-height:1.35}
+    .my-report-main small.v194-report-code{font-size:10px;color:#7a8b94}
+
+    @media(max-width:760px){
+      #piece-fields.piece-section{padding:14px}
+      #piece-fields .piece-subsection{padding-top:13px!important}
+      .welcome-card.v194-welcome{
+        display:grid;
+        gap:12px;
+        padding:2px 0 12px;
+      }
+      .welcome-card.v194-welcome h1{font-size:23px}
+      .welcome-card.v194-welcome .v194-greeting-sub{font-size:11px}
+      .v194-home-metrics{
+        justify-content:flex-start;
+        width:100%;
+      }
+      .v194-home-metric{
+        min-width:0;
+        flex:0 1 auto;
+        padding:1px 13px;
+      }
+      .v194-home-metric:first-child{padding-left:0}
+      .v194-home-metric strong{font-size:17px}
+      .v194-home-metric span{font-size:9.5px}
+      .action-section{margin-top:12px}
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Item 7 — melhora a transição Login -> Criar conta sem mudar o processo de cadastro.
+const _v194SetupAuthUI=setupAuthUI;
+setupAuthUI=function(){
+  _v194SetupAuthUI();
+  const managed=document.querySelector('.auth-managed-access');
+  if(managed){
+    managed.innerHTML='Ainda não possui uma conta? <button type="button" class="auth-inline-link" id="auth-create-account-link">Criar conta</button>.';
+    document.getElementById('auth-create-account-link')?.addEventListener('click',()=>showAuthTab('signup'));
+  }
+  document.querySelector('#signup-form > .auth-notice')?.remove();
+  ensureV194Styles();
+};
+
+function v194FirstName(){
+  const raw=String(currentUser()?.name||'').trim();
+  if(!raw||raw.includes('@'))return '';
+  return raw.split(/\s+/)[0];
+}
+function v194Greeting(){
+  const hour=new Date().getHours();
+  return hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';
+}
+function v194OwnReports(reports){
+  const uid=state.cloudUser?.id;
+  if(!uid)return [];
+  return reports.filter(report=>report.source!=='imported'&&(
+    report.raw?.usuario?.id===uid||
+    report.raw?.authorId===uid||
+    report.raw?.author_id===uid||
+    belongsToCurrentUser(report.raw)
+  ));
+}
+function v194ReportTime(report){
+  const raw=report?.createdAt||report?.raw?.created_at||report?.raw?.criadoEm||report?.date;
+  const time=new Date(raw||0).getTime();
+  return Number.isFinite(time)?time:0;
+}
+
+async function v194RefreshHomeSummary(){
+  const card=main.querySelector('.welcome-card');
+  if(!card)return;
+  card.classList.add('v194-welcome');
+
+  const firstName=v194FirstName();
+  const greeting=`${v194Greeting()}${firstName?`, ${esc(firstName)}`:''}.`;
+  let reports=[];
+  try{reports=await combinedReports()}catch(_){reports=[]}
+
+  let subtitle='';
+  let metrics='';
+
+  if(state.role==='admin'){
+    const operational=reports.filter(r=>r.source!=='imported');
+    const pending=operational.filter(r=>['enviado','corrigido'].includes(String(r.status||'').toLowerCase())).length;
+    const now=new Date(),weekStart=new Date(now);
+    weekStart.setHours(0,0,0,0);
+    weekStart.setDate(now.getDate()-((now.getDay()+6)%7));
+    const receivedWeek=operational.filter(r=>v194ReportTime(r)>=weekStart.getTime()).length;
+    subtitle=pending?'Há relatórios aguardando sua conferência.':'Nenhum relatório aguardando conferência neste momento.';
+    metrics=`<button class="v194-home-metric" type="button" data-v194-summary="reports"><strong>${pending}</strong><span>Aguardando conferência</span></button><button class="v194-home-metric" type="button" data-v194-summary="week"><strong>${receivedWeek}</strong><span>Recebidos esta semana</span></button>`;
+  }else{
+    const own=v194OwnReports(reports),rejected=own.filter(r=>String(r.status||'').toLowerCase()==='reprovado').length;
+    subtitle=rejected?'Há relatório devolvido que precisa da sua atenção.':'Registre atendimentos e acompanhe seus relatórios.';
+    metrics=`<button class="v194-home-metric" type="button" data-v194-summary="mine"><strong>${own.length}</strong><span>Meus relatórios</span></button>${rejected?`<button class="v194-home-metric" type="button" data-v194-summary="corrections"><strong>${rejected}</strong><span>Para corrigir</span></button>`:''}`;
+  }
+
+  card.innerHTML=`<div class="v194-greeting-copy"><h1>${greeting}</h1><p class="v194-greeting-sub">${esc(subtitle)}</p></div><div class="v194-home-metrics">${metrics}</div>`;
+
+  card.querySelector('[data-v194-summary="reports"]')?.addEventListener('click',()=>renderOverview());
+  card.querySelector('[data-v194-summary="week"]')?.addEventListener('click',()=>renderOverview());
+  card.querySelector('[data-v194-summary="mine"]')?.addEventListener('click',()=>document.querySelector('.my-reports-section')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  card.querySelector('[data-v194-summary="corrections"]')?.addEventListener('click',()=>document.querySelector('.field-review-section')?.scrollIntoView({behavior:'smooth',block:'start'}));
+}
+
+// Item 9 — a ordem é a mesma no Windows e no celular para manter previsibilidade.
+function v194OrderHomeActions(){
+  const grid=main.querySelector('.home-actions');
+  if(!grid)return;
+
+  if(state.role==='admin'&&!grid.querySelector('[data-home-action="users"]')){
+    const users=document.createElement('button');
+    users.className='home-action users';
+    users.type='button';
+    users.dataset.homeAction='users';
+    users.innerHTML='<span class="action-icon" data-icon="user"></span><h3>Usuários</h3><p>Gerencie acessos, perfis e notificações dos usuários da Central.</p><span class="action-link">Abrir usuários <span data-icon="arrow-right"></span></span>';
+    users.onclick=()=>renderUserManagement();
+    grid.appendChild(users);
+    hydrateIcons(users);
+  }
+
+  const order=state.role==='admin'
+    ?['maintenance','overview','integration','database','plan','users']
+    :['maintenance','integration','database'];
+
+  order.forEach(action=>{
+    const button=grid.querySelector(`[data-home-action="${action}"]`);
+    if(button)grid.appendChild(button);
+  });
+}
+
+// Item 5 — usa o ativo como título principal; MAN-... fica apenas como referência secundária.
+async function v194RefineMyReportTitles(){
+  const section=main.querySelector('.my-reports-section');
+  if(!section)return;
+  let reports=[];
+  try{reports=await combinedReports()}catch(_){return}
+  const byKey=new Map(reports.map(report=>[String(report.key),report]));
+
+  section.querySelectorAll('[data-my-report-key]').forEach(button=>{
+    const report=byKey.get(String(button.dataset.myReportKey));
+    if(!report)return;
+    const box=button.querySelector('.my-report-main');
+    if(!box)return;
+    const title=box.querySelector('strong'),meta=box.querySelector('span'),small=box.querySelector('small');
+    const assetTitle=(report.assets||[]).join(', ')||'Ativo não informado';
+    if(title)title.textContent=assetTitle;
+    if(meta)meta.textContent=`${report.type||'Manutenção'} · ${report.substation||'Local não informado'}`;
+    if(small){
+      small.classList.add('v194-report-code');
+      small.textContent=report.number?`Relatório ${report.number}`:'Relatório';
+    }
+  });
+}
+
+const _v194RenderHome=renderHome;
+renderHome=async function(){
+  await _v194RenderHome();
+  ensureV194Styles();
+  v194OrderHomeActions();
+  await v194RefreshHomeSummary();
+  await v194RefineMyReportTitles();
+  requestAnimationFrame(syncAdaptiveHeader);
+};
 
 (async()=>{
   await registerCentralServiceWorker();
