@@ -2526,6 +2526,90 @@ renderHome=async function(){
   await v194RefineMyReportTitles();
   requestAnimationFrame(syncAdaptiveHeader);
 };
+/* ===== v1.9.5 — proteção de senha vazada (HIBP via Edge Function) ===== */
+
+async function centralAssertSafePassword(password){
+  if(!navigator.onLine)throw new Error('Conecte-se à internet para validar a segurança da senha.');
+  const {data,error}=await cloudClient.functions.invoke('password-security',{body:{password}});
+  if(error){
+    let message=error.message||'Não foi possível validar a segurança da senha.';
+    try{
+      if(error.context&&typeof error.context.json==='function'){
+        const payload=await error.context.json();
+        message=payload?.error||payload?.message||message;
+      }
+    }catch(_){ }
+    throw new Error(message);
+  }
+  if(!data?.ok)throw new Error(data?.error||'Esta senha não passou pela validação de segurança.');
+  return true;
+}
+
+function centralWrapPasswordForm(form,{confirmName='confirm_password',showError}={}){
+  if(!form||form.dataset.passwordSecurityWrapped==='1'||typeof form.onsubmit!=='function')return;
+  const original=form.onsubmit;
+  form.dataset.passwordSecurityWrapped='1';
+  form.onsubmit=async function(event){
+    event.preventDefault();
+    const fd=new FormData(form),password=String(fd.get('password')||''),confirm=confirmName?String(fd.get(confirmName)||''):password;
+    if(password.length>=8&&password===confirm){
+      try{await centralAssertSafePassword(password)}
+      catch(error){
+        const message=error?.message||String(error);
+        if(typeof showError==='function')showError(message);
+        else toast(message,'warning');
+        return;
+      }
+    }
+    return original.call(form,event);
+  };
+}
+
+// Cadastro comum por e-mail/OTP.
+const _v195SetupAuthUI=setupAuthUI;
+setupAuthUI=function(){
+  _v195SetupAuthUI();
+  centralWrapPasswordForm(document.getElementById('signup-form'),{
+    confirmName:'confirm_password',
+    showError:message=>authMessage(message,'error'),
+  });
+};
+
+// Troca obrigatória da senha temporária.
+const _v195OpenForcedPasswordChange=openForcedPasswordChange;
+openForcedPasswordChange=function(){
+  _v195OpenForcedPasswordChange();
+  const form=document.getElementById('forced-password-form');
+  centralWrapPasswordForm(form,{
+    confirmName:'confirm',
+    showError:message=>{
+      const msg=document.getElementById('forced-password-message');
+      if(msg)msg.innerHTML=`<div class="auth-message error">${esc(message)}</div>`;
+      else toast(message,'warning');
+    },
+  });
+};
+
+// Criação de usuário pela Equipe Administrativa.
+const _v195OpenCreateUserDialog=openCreateUserDialog;
+openCreateUserDialog=function(){
+  _v195OpenCreateUserDialog();
+  centralWrapPasswordForm(document.getElementById('create-user-form'),{
+    confirmName:null,
+    showError:message=>toast(message,'warning'),
+  });
+};
+
+// Redefinição administrativa de senha temporária.
+const _v195OpenResetUserPasswordDialog=openResetUserPasswordDialog;
+openResetUserPasswordDialog=function(user){
+  _v195OpenResetUserPasswordDialog(user);
+  centralWrapPasswordForm(document.getElementById('reset-user-form'),{
+    confirmName:null,
+    showError:message=>toast(message,'warning'),
+  });
+};
+
 
 (async()=>{
   await registerCentralServiceWorker();
