@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.6'}};
-const APP_VERSION='1.9.6';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.7'}};
+const APP_VERSION='1.9.7';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.6.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.7.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1768,8 +1768,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.6';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='1.9.7';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1850,7 +1850,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';
 };
 
 
@@ -1938,7 +1938,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2030,8 +2030,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -2941,6 +2941,11 @@ openForcedPasswordChange=function(){
       storeIdentity(state.cloudUser,state.cloudProfile);
 
       document.getElementById('modal-root').innerHTML='';
+
+      if(centralForcedPasswordGateActive){
+        await centralResumeApplicationAfterForcedPasswordChange();
+      }
+
       toast('Senha atualizada com sucesso.');
 
     }catch(error){
@@ -2958,8 +2963,79 @@ openForcedPasswordChange=function(){
   };
 };
 
+
+/* ===== v1.9.7 — fechamento visual e isolamento da troca obrigatória ===== */
+
+/*
+ * Enquanto must_change_password=true, nenhuma base operacional é carregada.
+ * O app-shell é usado apenas como hospedeiro do modal de troca, e o CSS da
+ * v1.9.7 esconde cabeçalho, conteúdo, rodapé e navegação.
+ */
+let centralForcedPasswordGateActive=false;
+const _v197EnterApplication=enterApplication;
+
+enterApplication=async function(user,profile,options={}){
+  if(profile?.must_change_password){
+    state.cloudUser=user;
+    state.cloudProfile=profile;
+    state.role=profile.role==='admin'?'admin':'field';
+    state.offlineSession=!!options?.offline;
+    storeIdentity(user,profile);
+
+    centralForcedPasswordGateActive=true;
+    document.body.classList.add('forced-password-mode');
+
+    const authShell=document.getElementById('auth-shell');
+    const appShell=document.getElementById('app-shell');
+    if(authShell)authShell.classList.add('hidden');
+    if(appShell)appShell.classList.remove('hidden');
+    if(main)main.innerHTML='';
+
+    showCloudLoading(false);
+    openForcedPasswordChange();
+    return;
+  }
+
+  centralForcedPasswordGateActive=false;
+  document.body.classList.remove('forced-password-mode');
+  return _v197EnterApplication(user,profile,options);
+};
+
+async function centralResumeApplicationAfterForcedPasswordChange(){
+  if(!centralForcedPasswordGateActive)return;
+
+  const user=state.cloudUser;
+  const profile={...(state.cloudProfile||{}),must_change_password:false};
+
+  centralForcedPasswordGateActive=false;
+  document.body.classList.remove('forced-password-mode');
+
+  if(!user)return;
+  await _v197EnterApplication(user,profile,{offline:false});
+}
+
+/*
+ * Simplificação visual da tela Usuários.
+ * Dados de convites, notificações e auditoria continuam preservados no backend.
+ */
+const _v197RenderUserManagement=renderUserManagement;
+renderUserManagement=async function(...args){
+  await _v197RenderUserManagement(...args);
+  if(state.screen!=='users')return;
+
+  document.getElementById('new-invite')?.remove();
+  main.querySelector('.invite-panel')?.remove();
+  main.querySelector('.user-audit')?.remove();
+
+  main.querySelectorAll('section.panel').forEach(panel=>{
+    const title=panel.querySelector('.section-title h2')?.textContent?.trim();
+    if(title==='Últimas notificações')panel.remove();
+  });
+
+  requestAnimationFrame(syncAdaptiveHeader);
+};
+
 (async()=>{
   await registerCentralServiceWorker();
   if(await ensureCurrentBuild())bootConnectedApp();
 })();
-
