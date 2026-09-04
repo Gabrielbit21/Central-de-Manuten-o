@@ -1,4 +1,4 @@
-const SW_VERSION = '1.9.6-media-v4.2';
+const SW_VERSION = '1.9.7-media-v4.2';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './version.json',
   './app.js',
+  './assets/login-subestacao.jpg',
   './assets/js/media-core.js',
   './assets/css/media-core.css',
   './vendor/supabase-js-2.57.4.min.js',
@@ -123,3 +124,4 @@ self.addEventListener('notificationclick', event => {
     return self.clients.openWindow(targetUrl);
   })());
 });
+

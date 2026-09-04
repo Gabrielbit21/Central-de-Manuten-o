@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.6'}};
-const APP_VERSION='1.9.6';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.7'}};
+const APP_VERSION='1.9.7';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -95,7 +95,47 @@ function canonicalTeamName(name){
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const stepLabels=['Subestação','Equipamentos','Confirmação','Formulário','Revisão'];
 function steps(active){return `<div class="steps">${stepLabels.map((x,i)=>`${i?'<span class="step-line"></span>':''}<span class="step ${i<active?'done':i===active?'active':''}"><b>${i+1}</b>${x}</span>`).join('')}</div>`}
-function toast(text,type='success'){const id='toast-'+Date.now();document.body.insertAdjacentHTML('beforeend',`<div id="${id}" class="${type}" style="position:fixed;right:18px;top:88px;z-index:150;max-width:390px;box-shadow:var(--shadow)">${esc(text)}</div>`);setTimeout(()=>document.getElementById(id)?.remove(),3500)}
+function toast(text,type='success'){
+  if(!text)return;
+
+  const validTypes=['success','warning','error','info'];
+  const kind=validTypes.includes(type)?type:'info';
+
+  let stack=document.getElementById('central-toast-stack');
+
+  if(!stack){
+    stack=document.createElement('div');
+    stack.id='central-toast-stack';
+    stack.setAttribute('aria-live','polite');
+    stack.setAttribute('aria-atomic','false');
+    document.body.appendChild(stack);
+  }
+
+  const item=document.createElement('div');
+  item.className=`central-toast central-toast--${kind}`;
+  item.setAttribute('role',kind==='error'?'alert':'status');
+
+  item.innerHTML=`
+    <span class="central-toast-indicator"></span>
+    <span class="central-toast-text">${esc(text)}</span>
+  `;
+
+  stack.appendChild(item);
+
+  requestAnimationFrame(()=>{
+    item.classList.add('show');
+  });
+
+  const remove=()=>{
+    item.classList.remove('show');
+    setTimeout(()=>{
+      item.remove();
+      if(stack&&!stack.children.length)stack.remove();
+    },180);
+  };
+
+  setTimeout(remove,3800);
+}
 
 // IndexedDB: fotos de perfil, registros, fotos de manutenção e rascunhos.
 let dbPromise;
@@ -661,14 +701,37 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.6.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.7.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
 const cloudClient=window.supabase?.createClient(window.CENTRAL_CLOUD_CONFIG.supabaseUrl,window.CENTRAL_CLOUD_CONFIG.supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let pendingVerificationEmail=localStorage.getItem('central_pending_verification_email')||'';
 
-function authMessage(text,type='info'){const box=document.getElementById('auth-message');if(!box)return;box.innerHTML=text?`<div class="auth-message ${type}">${esc(text)}</div>`:''}
+function authMessage(text,type='info'){
+  const box=document.getElementById('auth-message');
+  if(!box)return;
+
+  if(!text){
+    box.innerHTML='';
+    return;
+  }
+
+  /* Erros de preenchimento continuam junto do formulário. */
+  if(type==='error'){
+    box.innerHTML=`<div class="auth-message error">${esc(text)}</div>`;
+    return;
+  }
+
+  /* Sucessos e avisos transitórios passam para o canto superior direito. */
+  box.innerHTML='';
+  toast(
+    text,
+    type==='success'?'success':
+    type==='warning'?'warning':
+    'info'
+  );
+}
 function setAuthBusy(form,busy,label){const button=form?.querySelector('button[type="submit"]');if(!button)return;if(!button.dataset.label)button.dataset.label=button.textContent;button.disabled=busy;button.textContent=busy?label:button.dataset.label}
 function isValidAccountEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email||'').trim().toLowerCase())}
 function showAuthTab(name){if(name==='verify'&&!pendingVerificationEmail)name='signup';const activeTab=(name==='verify'||name==='invite')?'signup':name;document.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active',b.dataset.authTab===activeTab));document.querySelectorAll('[data-auth-pane]').forEach(p=>p.classList.toggle('active',p.dataset.authPane===name));if(name==='verify'){document.getElementById('verify-email-target').textContent=pendingVerificationEmail||'Informe o e-mail na etapa anterior'}authMessage('')}
@@ -1705,8 +1768,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.6';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='1.9.7';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1787,7 +1850,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';
 };
 
 
@@ -1875,7 +1938,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -1967,8 +2030,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.7';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.7';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -2609,6 +2672,200 @@ openResetUserPasswordDialog=function(user){
     showError:message=>toast(message,'warning'),
   });
 };
+
+/* ===== v1.9.7 — checklist visual da senha obrigatória ===== */
+
+function centralPasswordChecklistHTML(){
+  return `
+    <div id="central-password-checklist" class="central-password-checklist" aria-live="polite">
+      <div class="central-password-checklist-title">Requisitos da nova senha</div>
+      <div class="central-password-checklist-item" data-rule="length">
+        <span class="central-password-check-icon">○</span>
+        <span>Pelo menos 8 caracteres</span>
+      </div>
+      <div class="central-password-checklist-item" data-rule="match">
+        <span class="central-password-check-icon">○</span>
+        <span>As senhas coincidem</span>
+      </div>
+      <div class="central-password-checklist-item" data-rule="leaked">
+        <span class="central-password-check-icon">○</span>
+        <span>Não encontrada em vazamentos conhecidos</span>
+      </div>
+      <div class="central-password-checklist-item recommended" data-rule="number">
+        <span class="central-password-check-icon">○</span>
+        <span>Recomendado: incluir número</span>
+      </div>
+      <div class="central-password-checklist-item recommended" data-rule="symbol">
+        <span class="central-password-check-icon">○</span>
+        <span>Recomendado: incluir símbolo</span>
+      </div>
+      <div class="central-password-checklist-hint">
+        Número e símbolo são recomendações para fortalecer a senha; não são obrigatórios.
+      </div>
+    </div>
+  `;
+}
+
+function centralEnsurePasswordChecklistStyles(){
+  if(document.getElementById('central-password-checklist-styles'))return;
+
+  const style=document.createElement('style');
+  style.id='central-password-checklist-styles';
+  style.textContent=`
+    .central-password-checklist{
+      margin:12px 0 14px;
+      padding:12px 13px;
+      border:1px solid #e1eaed;
+      border-radius:12px;
+      background:#f8fafb;
+      text-align:left;
+    }
+
+    .central-password-checklist-title{
+      margin-bottom:8px;
+      color:#35515d;
+      font-size:12px;
+      font-weight:750;
+    }
+
+    .central-password-checklist-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-height:24px;
+      color:#647983;
+      font-size:11.5px;
+      line-height:1.35;
+      transition:color .15s ease;
+    }
+
+    .central-password-checklist-icon{
+      width:18px;
+      flex:0 0 18px;
+      text-align:center;
+      color:#9aabb2;
+      font-size:14px;
+      font-weight:800;
+    }
+
+    .central-password-checklist-item.ok{
+      color:#286c51;
+    }
+
+    .central-password-checklist-item.ok .central-password-check-icon{
+      color:var(--success);
+    }
+
+    .central-password-checklist-item.fail{
+      color:#a43e3e;
+    }
+
+    .central-password-checklist-item.fail .central-password-check-icon{
+      color:var(--danger);
+    }
+
+    .central-password-checklist-item.pending{
+      color:#637780;
+    }
+
+    .central-password-checklist-item.pending .central-password-check-icon{
+      color:var(--blue);
+    }
+
+    .central-password-checklist-item.recommended{
+      color:#788a91;
+    }
+
+    .central-password-checklist-hint{
+      margin-top:7px;
+      color:#83939a;
+      font-size:10.5px;
+      line-height:1.4;
+    }
+
+    @media(max-width:760px){
+      .central-password-checklist{
+        margin:10px 0 13px;
+        padding:11px 12px;
+      }
+
+      .central-password-checklist-item{
+        font-size:11px;
+      }
+
+      .central-password-checklist-hint{
+        font-size:10px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function centralUpdatePasswordChecklist(password,confirm,{leaked='pending'}={}){
+  const root=document.getElementById('central-password-checklist');
+  if(!root)return;
+
+  const setRule=(name,state)=>{
+    const item=root.querySelector(`[data-rule="${name}"]`);
+    if(!item)return;
+    item.classList.remove('ok','fail','pending');
+    if(state)item.classList.add(state);
+    const icon=item.querySelector('.central-password-check-icon');
+    if(icon)icon.textContent=state==='ok'?'✓':state==='fail'?'✕':'○';
+  };
+
+  setRule('length',password.length>=8?'ok':password.length?'fail':'pending');
+  setRule('match',confirm&&password===confirm?'ok':confirm?'fail':'pending');
+  setRule('leaked',leaked==='safe'?'ok':leaked==='compromised'?'fail':'pending');
+
+  setRule('number',/\d/.test(password)?'ok':'pending');
+  setRule('symbol',/[^\p{L}\p{N}\s]/u.test(password)?'ok':'pending');
+}
+
+function centralInstallPasswordChecklist(form){
+  if(!form)return;
+
+  centralEnsurePasswordChecklistStyles();
+
+  if(!document.getElementById('central-password-checklist')){
+    const anchor=form.querySelector('.auth-field:nth-of-type(2)');
+    const target=anchor||form.querySelector('.auth-submit');
+    if(target){
+      target.insertAdjacentHTML('beforebegin',centralPasswordChecklistHTML());
+    }
+  }
+
+  const password=form.querySelector('input[name="password"]');
+  const confirm=form.querySelector('input[name="confirm"]');
+  if(!password||!confirm)return;
+
+  const refresh=()=>{
+    centralUpdatePasswordChecklist(password.value,confirm.value);
+  };
+
+  password.addEventListener('input',refresh);
+  confirm.addEventListener('input',refresh);
+  refresh();
+}
+
+function centralSetPasswordChecklistLeakedState(state){
+  const item=document.querySelector('#central-password-checklist [data-rule="leaked"]');
+  if(!item)return;
+
+  item.classList.remove('ok','fail','pending');
+
+  if(state==='safe'){
+    item.classList.add('ok');
+  }else if(state==='compromised'){
+    item.classList.add('fail');
+  }else{
+    item.classList.add('pending');
+  }
+
+  const icon=item.querySelector('.central-password-check-icon');
+  if(icon)icon.textContent=state==='safe'?'✓':state==='compromised'?'✕':'○';
+}
+
 /* ===== v1.9.6 — troca obrigatória de senha concluída pelo backend ===== */
 
 const _v196OpenForcedPasswordChange=openForcedPasswordChange;
@@ -2619,6 +2876,8 @@ openForcedPasswordChange=function(){
   const form=document.getElementById('forced-password-form');
   if(!form)return;
 
+  centralInstallPasswordChecklist(form);
+
   form.onsubmit=async e=>{
     e.preventDefault();
 
@@ -2628,11 +2887,13 @@ openForcedPasswordChange=function(){
     const msg=document.getElementById('forced-password-message');
 
     if(password.length<8){
+      centralUpdatePasswordChecklist(password,confirm);
       msg.innerHTML='<div class="auth-message error">Use pelo menos 8 caracteres.</div>';
       return;
     }
 
     if(password!==confirm){
+      centralUpdatePasswordChecklist(password,confirm);
       msg.innerHTML='<div class="auth-message error">As senhas não coincidem.</div>';
       return;
     }
@@ -2642,9 +2903,15 @@ openForcedPasswordChange=function(){
       return;
     }
 
-    setAuthBusy(form,true,'Salvando…');
+    centralSetPasswordChecklistLeakedState('pending');
+    setAuthBusy(form,true,'Validando…');
 
     try{
+      await centralAssertSafePassword(password);
+      centralSetPasswordChecklistLeakedState('safe');
+
+      setAuthBusy(form,true,'Salvando…');
+
       const {data,error}=await cloudClient.functions.invoke(
         'change-own-password',
         {body:{password}}
@@ -2674,15 +2941,98 @@ openForcedPasswordChange=function(){
       storeIdentity(state.cloudUser,state.cloudProfile);
 
       document.getElementById('modal-root').innerHTML='';
+
+      if(centralForcedPasswordGateActive){
+        await centralResumeApplicationAfterForcedPasswordChange();
+      }
+
       toast('Senha atualizada com sucesso.');
 
     }catch(error){
+      const message=error?.message||String(error);
+      if(/vazamento|vazamentos|comprometida|apareceu/i.test(message)){
+        centralSetPasswordChecklistLeakedState('compromised');
+      }else{
+        centralSetPasswordChecklistLeakedState('pending');
+      }
       msg.innerHTML=
-        `<div class="auth-message error">${esc(error.message||String(error))}</div>`;
+        `<div class="auth-message error">${esc(message)}</div>`;
     }finally{
       setAuthBusy(form,false);
     }
   };
+};
+
+
+/* ===== v1.9.7 — fechamento visual e isolamento da troca obrigatória ===== */
+
+/*
+ * Enquanto must_change_password=true, nenhuma base operacional é carregada.
+ * O app-shell é usado apenas como hospedeiro do modal de troca, e o CSS da
+ * v1.9.7 esconde cabeçalho, conteúdo, rodapé e navegação.
+ */
+let centralForcedPasswordGateActive=false;
+const _v197EnterApplication=enterApplication;
+
+enterApplication=async function(user,profile,options={}){
+  if(profile?.must_change_password){
+    state.cloudUser=user;
+    state.cloudProfile=profile;
+    state.role=profile.role==='admin'?'admin':'field';
+    state.offlineSession=!!options?.offline;
+    storeIdentity(user,profile);
+
+    centralForcedPasswordGateActive=true;
+    document.body.classList.add('forced-password-mode');
+
+    const authShell=document.getElementById('auth-shell');
+    const appShell=document.getElementById('app-shell');
+    if(authShell)authShell.classList.add('hidden');
+    if(appShell)appShell.classList.remove('hidden');
+    if(main)main.innerHTML='';
+
+    showCloudLoading(false);
+    openForcedPasswordChange();
+    return;
+  }
+
+  centralForcedPasswordGateActive=false;
+  document.body.classList.remove('forced-password-mode');
+  return _v197EnterApplication(user,profile,options);
+};
+
+async function centralResumeApplicationAfterForcedPasswordChange(){
+  if(!centralForcedPasswordGateActive)return;
+
+  const user=state.cloudUser;
+  const profile={...(state.cloudProfile||{}),must_change_password:false};
+
+  centralForcedPasswordGateActive=false;
+  document.body.classList.remove('forced-password-mode');
+
+  if(!user)return;
+  await _v197EnterApplication(user,profile,{offline:false});
+}
+
+/*
+ * Simplificação visual da tela Usuários.
+ * Dados de convites, notificações e auditoria continuam preservados no backend.
+ */
+const _v197RenderUserManagement=renderUserManagement;
+renderUserManagement=async function(...args){
+  await _v197RenderUserManagement(...args);
+  if(state.screen!=='users')return;
+
+  document.getElementById('new-invite')?.remove();
+  main.querySelector('.invite-panel')?.remove();
+  main.querySelector('.user-audit')?.remove();
+
+  main.querySelectorAll('section.panel').forEach(panel=>{
+    const title=panel.querySelector('.section-title h2')?.textContent?.trim();
+    if(title==='Últimas notificações')panel.remove();
+  });
+
+  requestAnimationFrame(syncAdaptiveHeader);
 };
 
 (async()=>{
