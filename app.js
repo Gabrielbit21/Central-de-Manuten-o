@@ -2609,7 +2609,81 @@ openResetUserPasswordDialog=function(user){
     showError:message=>toast(message,'warning'),
   });
 };
+/* ===== v1.9.6 — troca obrigatória de senha concluída pelo backend ===== */
 
+const _v196OpenForcedPasswordChange=openForcedPasswordChange;
+
+openForcedPasswordChange=function(){
+  _v196OpenForcedPasswordChange();
+
+  const form=document.getElementById('forced-password-form');
+  if(!form)return;
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    const fd=new FormData(form);
+    const password=String(fd.get('password'));
+    const confirm=String(fd.get('confirm'));
+    const msg=document.getElementById('forced-password-message');
+
+    if(password.length<8){
+      msg.innerHTML='<div class="auth-message error">Use pelo menos 8 caracteres.</div>';
+      return;
+    }
+
+    if(password!==confirm){
+      msg.innerHTML='<div class="auth-message error">As senhas não coincidem.</div>';
+      return;
+    }
+
+    if(!navigator.onLine){
+      msg.innerHTML='<div class="auth-message error">Conecte-se à internet para trocar a senha.</div>';
+      return;
+    }
+
+    setAuthBusy(form,true,'Salvando…');
+
+    try{
+      const {data,error}=await cloudClient.functions.invoke(
+        'change-own-password',
+        {body:{password}}
+      );
+
+      if(error){
+        let message=error.message||'Não foi possível alterar a senha.';
+
+        try{
+          if(error.context&&typeof error.context.json==='function'){
+            const payload=await error.context.json();
+            message=payload?.error||payload?.message||message;
+          }
+        }catch(_){}
+
+        throw new Error(message);
+      }
+
+      if(!data?.ok){
+        throw new Error(
+          data?.error||
+          'Não foi possível concluir a troca obrigatória da senha.'
+        );
+      }
+
+      state.cloudProfile.must_change_password=false;
+      storeIdentity(state.cloudUser,state.cloudProfile);
+
+      document.getElementById('modal-root').innerHTML='';
+      toast('Senha atualizada com sucesso.');
+
+    }catch(error){
+      msg.innerHTML=
+        `<div class="auth-message error">${esc(error.message||String(error))}</div>`;
+    }finally{
+      setAuthBusy(form,false);
+    }
+  };
+};
 
 (async()=>{
   await registerCentralServiceWorker();
