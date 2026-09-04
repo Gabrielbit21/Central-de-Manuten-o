@@ -26,7 +26,25 @@ async function sha256Hex(value: string) {
 }
 const url = Deno.env.get('SUPABASE_URL')!
 const admin = createClient(url, serviceKey(), { auth: { persistSession: false, autoRefreshToken: false } })
+async function ensureSafePassword(password: string) {
+  const response = await fetch(`${url}/functions/v1/password-security`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': serviceKey(),
+    },
+    body: JSON.stringify({ password }),
+  })
 
+  const result = await response.json().catch(() => ({}))
+
+  if (!response.ok || result?.ok !== true) {
+    throw new Error(
+      result?.error ||
+      'Não foi possível validar a segurança da senha agora.'
+    )
+  }
+}
 async function findUserByEmail(email: string) {
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 100 })
@@ -63,6 +81,7 @@ Deno.serve(async req => {
     if (!displayName) throw new Error('Informe seu nome completo.')
     if (!whatsapp) throw new Error('Informe um telefone/WhatsApp válido com DDD.')
     if (code.length !== 16) throw new Error('Código de convite inválido.')
+    await ensureSafePassword(password)
     const codeHash = await sha256Hex(code), now = new Date().toISOString()
     const { data: invite, error: inviteError } = await admin.from('signup_invites').select('*').eq('code_hash', codeHash).maybeSingle()
     if (inviteError) throw inviteError
