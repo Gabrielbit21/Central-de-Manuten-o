@@ -2672,6 +2672,200 @@ openResetUserPasswordDialog=function(user){
     showError:message=>toast(message,'warning'),
   });
 };
+
+/* ===== v1.9.7 — checklist visual da senha obrigatória ===== */
+
+function centralPasswordChecklistHTML(){
+  return `
+    <div id="central-password-checklist" class="central-password-checklist" aria-live="polite">
+      <div class="central-password-checklist-title">Requisitos da nova senha</div>
+      <div class="central-password-checklist-item" data-rule="length">
+        <span class="central-password-check-icon">○</span>
+        <span>Pelo menos 8 caracteres</span>
+      </div>
+      <div class="central-password-checklist-item" data-rule="match">
+        <span class="central-password-check-icon">○</span>
+        <span>As senhas coincidem</span>
+      </div>
+      <div class="central-password-checklist-item" data-rule="leaked">
+        <span class="central-password-check-icon">○</span>
+        <span>Não encontrada em vazamentos conhecidos</span>
+      </div>
+      <div class="central-password-checklist-item recommended" data-rule="number">
+        <span class="central-password-check-icon">○</span>
+        <span>Recomendado: incluir número</span>
+      </div>
+      <div class="central-password-checklist-item recommended" data-rule="symbol">
+        <span class="central-password-check-icon">○</span>
+        <span>Recomendado: incluir símbolo</span>
+      </div>
+      <div class="central-password-checklist-hint">
+        Número e símbolo são recomendações para fortalecer a senha; não são obrigatórios.
+      </div>
+    </div>
+  `;
+}
+
+function centralEnsurePasswordChecklistStyles(){
+  if(document.getElementById('central-password-checklist-styles'))return;
+
+  const style=document.createElement('style');
+  style.id='central-password-checklist-styles';
+  style.textContent=`
+    .central-password-checklist{
+      margin:12px 0 14px;
+      padding:12px 13px;
+      border:1px solid #e1eaed;
+      border-radius:12px;
+      background:#f8fafb;
+      text-align:left;
+    }
+
+    .central-password-checklist-title{
+      margin-bottom:8px;
+      color:#35515d;
+      font-size:12px;
+      font-weight:750;
+    }
+
+    .central-password-checklist-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-height:24px;
+      color:#647983;
+      font-size:11.5px;
+      line-height:1.35;
+      transition:color .15s ease;
+    }
+
+    .central-password-checklist-icon{
+      width:18px;
+      flex:0 0 18px;
+      text-align:center;
+      color:#9aabb2;
+      font-size:14px;
+      font-weight:800;
+    }
+
+    .central-password-checklist-item.ok{
+      color:#286c51;
+    }
+
+    .central-password-checklist-item.ok .central-password-check-icon{
+      color:var(--success);
+    }
+
+    .central-password-checklist-item.fail{
+      color:#a43e3e;
+    }
+
+    .central-password-checklist-item.fail .central-password-check-icon{
+      color:var(--danger);
+    }
+
+    .central-password-checklist-item.pending{
+      color:#637780;
+    }
+
+    .central-password-checklist-item.pending .central-password-check-icon{
+      color:var(--blue);
+    }
+
+    .central-password-checklist-item.recommended{
+      color:#788a91;
+    }
+
+    .central-password-checklist-hint{
+      margin-top:7px;
+      color:#83939a;
+      font-size:10.5px;
+      line-height:1.4;
+    }
+
+    @media(max-width:760px){
+      .central-password-checklist{
+        margin:10px 0 13px;
+        padding:11px 12px;
+      }
+
+      .central-password-checklist-item{
+        font-size:11px;
+      }
+
+      .central-password-checklist-hint{
+        font-size:10px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function centralUpdatePasswordChecklist(password,confirm,{leaked='pending'}={}){
+  const root=document.getElementById('central-password-checklist');
+  if(!root)return;
+
+  const setRule=(name,state)=>{
+    const item=root.querySelector(`[data-rule="${name}"]`);
+    if(!item)return;
+    item.classList.remove('ok','fail','pending');
+    if(state)item.classList.add(state);
+    const icon=item.querySelector('.central-password-check-icon');
+    if(icon)icon.textContent=state==='ok'?'✓':state==='fail'?'✕':'○';
+  };
+
+  setRule('length',password.length>=8?'ok':password.length?'fail':'pending');
+  setRule('match',confirm&&password===confirm?'ok':confirm?'fail':'pending');
+  setRule('leaked',leaked==='safe'?'ok':leaked==='compromised'?'fail':'pending');
+
+  setRule('number',/\d/.test(password)?'ok':'pending');
+  setRule('symbol',/[^\p{L}\p{N}\s]/u.test(password)?'ok':'pending');
+}
+
+function centralInstallPasswordChecklist(form){
+  if(!form)return;
+
+  centralEnsurePasswordChecklistStyles();
+
+  if(!document.getElementById('central-password-checklist')){
+    const anchor=form.querySelector('.auth-field:nth-of-type(2)');
+    const target=anchor||form.querySelector('.auth-submit');
+    if(target){
+      target.insertAdjacentHTML('beforebegin',centralPasswordChecklistHTML());
+    }
+  }
+
+  const password=form.querySelector('input[name="password"]');
+  const confirm=form.querySelector('input[name="confirm"]');
+  if(!password||!confirm)return;
+
+  const refresh=()=>{
+    centralUpdatePasswordChecklist(password.value,confirm.value);
+  };
+
+  password.addEventListener('input',refresh);
+  confirm.addEventListener('input',refresh);
+  refresh();
+}
+
+function centralSetPasswordChecklistLeakedState(state){
+  const item=document.querySelector('#central-password-checklist [data-rule="leaked"]');
+  if(!item)return;
+
+  item.classList.remove('ok','fail','pending');
+
+  if(state==='safe'){
+    item.classList.add('ok');
+  }else if(state==='compromised'){
+    item.classList.add('fail');
+  }else{
+    item.classList.add('pending');
+  }
+
+  const icon=item.querySelector('.central-password-check-icon');
+  if(icon)icon.textContent=state==='safe'?'✓':state==='compromised'?'✕':'○';
+}
+
 /* ===== v1.9.6 — troca obrigatória de senha concluída pelo backend ===== */
 
 const _v196OpenForcedPasswordChange=openForcedPasswordChange;
@@ -2682,6 +2876,8 @@ openForcedPasswordChange=function(){
   const form=document.getElementById('forced-password-form');
   if(!form)return;
 
+  centralInstallPasswordChecklist(form);
+
   form.onsubmit=async e=>{
     e.preventDefault();
 
@@ -2691,11 +2887,13 @@ openForcedPasswordChange=function(){
     const msg=document.getElementById('forced-password-message');
 
     if(password.length<8){
+      centralUpdatePasswordChecklist(password,confirm);
       msg.innerHTML='<div class="auth-message error">Use pelo menos 8 caracteres.</div>';
       return;
     }
 
     if(password!==confirm){
+      centralUpdatePasswordChecklist(password,confirm);
       msg.innerHTML='<div class="auth-message error">As senhas não coincidem.</div>';
       return;
     }
@@ -2705,9 +2903,15 @@ openForcedPasswordChange=function(){
       return;
     }
 
-    setAuthBusy(form,true,'Salvando…');
+    centralSetPasswordChecklistLeakedState('pending');
+    setAuthBusy(form,true,'Validando…');
 
     try{
+      await centralAssertSafePassword(password);
+      centralSetPasswordChecklistLeakedState('safe');
+
+      setAuthBusy(form,true,'Salvando…');
+
       const {data,error}=await cloudClient.functions.invoke(
         'change-own-password',
         {body:{password}}
@@ -2740,8 +2944,14 @@ openForcedPasswordChange=function(){
       toast('Senha atualizada com sucesso.');
 
     }catch(error){
+      const message=error?.message||String(error);
+      if(/vazamento|vazamentos|comprometida|apareceu/i.test(message)){
+        centralSetPasswordChecklistLeakedState('compromised');
+      }else{
+        centralSetPasswordChecklistLeakedState('pending');
+      }
       msg.innerHTML=
-        `<div class="auth-message error">${esc(error.message||String(error))}</div>`;
+        `<div class="auth-message error">${esc(message)}</div>`;
     }finally{
       setAuthBusy(form,false);
     }
@@ -2752,3 +2962,4 @@ openForcedPasswordChange=function(){
   await registerCentralServiceWorker();
   if(await ensureCurrentBuild())bootConnectedApp();
 })();
+
