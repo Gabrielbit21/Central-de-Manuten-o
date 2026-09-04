@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.5'}};
-const APP_VERSION='1.9.5';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.6'}};
+const APP_VERSION='1.9.6';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -661,7 +661,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.5.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.6.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1705,8 +1705,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.5';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.5';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='1.9.6';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1787,7 +1787,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.5';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
 };
 
 
@@ -1875,7 +1875,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.5';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.5'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -1967,8 +1967,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.5';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.5';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.6';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.6';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -2609,7 +2609,81 @@ openResetUserPasswordDialog=function(user){
     showError:message=>toast(message,'warning'),
   });
 };
+/* ===== v1.9.6 — troca obrigatória de senha concluída pelo backend ===== */
 
+const _v196OpenForcedPasswordChange=openForcedPasswordChange;
+
+openForcedPasswordChange=function(){
+  _v196OpenForcedPasswordChange();
+
+  const form=document.getElementById('forced-password-form');
+  if(!form)return;
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    const fd=new FormData(form);
+    const password=String(fd.get('password'));
+    const confirm=String(fd.get('confirm'));
+    const msg=document.getElementById('forced-password-message');
+
+    if(password.length<8){
+      msg.innerHTML='<div class="auth-message error">Use pelo menos 8 caracteres.</div>';
+      return;
+    }
+
+    if(password!==confirm){
+      msg.innerHTML='<div class="auth-message error">As senhas não coincidem.</div>';
+      return;
+    }
+
+    if(!navigator.onLine){
+      msg.innerHTML='<div class="auth-message error">Conecte-se à internet para trocar a senha.</div>';
+      return;
+    }
+
+    setAuthBusy(form,true,'Salvando…');
+
+    try{
+      const {data,error}=await cloudClient.functions.invoke(
+        'change-own-password',
+        {body:{password}}
+      );
+
+      if(error){
+        let message=error.message||'Não foi possível alterar a senha.';
+
+        try{
+          if(error.context&&typeof error.context.json==='function'){
+            const payload=await error.context.json();
+            message=payload?.error||payload?.message||message;
+          }
+        }catch(_){}
+
+        throw new Error(message);
+      }
+
+      if(!data?.ok){
+        throw new Error(
+          data?.error||
+          'Não foi possível concluir a troca obrigatória da senha.'
+        );
+      }
+
+      state.cloudProfile.must_change_password=false;
+      storeIdentity(state.cloudUser,state.cloudProfile);
+
+      document.getElementById('modal-root').innerHTML='';
+      toast('Senha atualizada com sucesso.');
+
+    }catch(error){
+      msg.innerHTML=
+        `<div class="auth-message error">${esc(error.message||String(error))}</div>`;
+    }finally{
+      setAuthBusy(form,false);
+    }
+  };
+};
 
 (async()=>{
   await registerCentralServiceWorker();
