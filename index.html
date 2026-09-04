@@ -1450,6 +1450,175 @@ main:has(> .home-hero) .home-action .action-icon{margin-bottom:clamp(10px,2vh,22
 }
 </style>
 
+
+<style id="v197-login-hero">
+/* ===== v1.9.7 — imagem institucional na tela de acesso ===== */
+.auth-shell{
+  position:relative;
+  isolation:isolate;
+  min-height:100vh;
+  min-height:100dvh;
+  overflow:hidden;
+  display:grid;
+  place-items:start center;
+  padding:
+    clamp(175px,25vh,270px)
+    18px
+    34px;
+  background:#fff;
+  color:var(--ink);
+}
+
+/* Foto ocupa apenas a parte superior e desaparece suavemente no branco. */
+.auth-shell::before{
+  content:'';
+  position:absolute;
+  z-index:-2;
+  inset:0 0 auto;
+  height:clamp(390px,58vh,650px);
+  pointer-events:none;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0) 64%,
+      rgba(255,255,255,.18) 72%,
+      rgba(255,255,255,.62) 84%,
+      #fff 100%
+    ),
+    url('./assets/login-subestacao.jpg');
+  background-size:cover;
+  background-position:center 44%;
+  background-repeat:no-repeat;
+}
+
+/* Leve claridade para manter a identidade visual corporativa sem escurecer a foto. */
+.auth-shell::after{
+  content:'';
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.04) 0%,
+      rgba(255,255,255,0) 42%,
+      rgba(255,255,255,.10) 58%,
+      #fff 78%
+    );
+}
+
+.auth-wrap{
+  position:relative;
+  z-index:1;
+  width:min(470px,100%);
+  text-align:center;
+}
+
+.auth-logo{
+  width:min(190px,54vw);
+  height:68px;
+  object-fit:contain;
+  margin:0 auto 18px;
+  display:block;
+  filter:
+    drop-shadow(0 2px 8px rgba(255,255,255,.96))
+    drop-shadow(0 7px 18px rgba(24,73,91,.12));
+}
+
+.auth-card{
+  background:rgba(255,255,255,.985);
+  border:1px solid rgba(219,229,234,.96);
+  border-radius:18px;
+  box-shadow:
+    0 18px 55px rgba(25,58,75,.13),
+    0 2px 8px rgba(25,58,75,.04);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+
+/* Notebook baixo: preserva a foto sem empurrar o formulário para fora da viewport. */
+@media (min-width:761px) and (max-height:760px){
+  .auth-shell{
+    padding-top:clamp(120px,18vh,160px);
+    padding-bottom:24px;
+  }
+  .auth-shell::before{
+    height:clamp(330px,57vh,470px);
+  }
+  .auth-logo{
+    height:58px;
+    margin-bottom:12px;
+  }
+}
+
+/* Mobile: recorte mais compacto e formulário continua imediatamente acessível. */
+@media(max-width:760px){
+  .auth-shell{
+    min-height:100svh;
+    min-height:100dvh;
+    padding:
+      clamp(125px,18vh,170px)
+      14px
+      calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .auth-shell::before{
+    height:clamp(300px,45vh,430px);
+    background-position:center 42%;
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0) 58%,
+        rgba(255,255,255,.22) 70%,
+        rgba(255,255,255,.72) 86%,
+        #fff 100%
+      ),
+      url('./assets/login-subestacao.jpg');
+  }
+
+  .auth-shell::after{
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255,255,255,.02) 0%,
+        rgba(255,255,255,0) 38%,
+        rgba(255,255,255,.18) 56%,
+        #fff 74%
+      );
+  }
+
+  .auth-wrap{
+    width:min(470px,100%);
+  }
+
+  .auth-logo{
+    width:min(164px,48vw);
+    height:58px;
+    margin-bottom:14px;
+  }
+
+  .auth-card{
+    border-radius:17px;
+    background:rgba(255,255,255,.99);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+  }
+}
+
+@media(max-width:430px){
+  .auth-shell{
+    padding-top:clamp(110px,16vh,145px);
+  }
+
+  .auth-shell::before{
+    height:clamp(270px,42vh,360px);
+  }
+}
+</style>
+
 </head>
 <body>
 
