@@ -1,6 +1,6 @@
 {
   "name": "central-manutencao-se-mobile",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "private": true,
   "description": "Camada Android nativa da Central de Manutenção SE.",
   "scripts": {
