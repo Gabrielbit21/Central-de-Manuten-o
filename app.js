@@ -95,7 +95,47 @@ function canonicalTeamName(name){
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const stepLabels=['Subestação','Equipamentos','Confirmação','Formulário','Revisão'];
 function steps(active){return `<div class="steps">${stepLabels.map((x,i)=>`${i?'<span class="step-line"></span>':''}<span class="step ${i<active?'done':i===active?'active':''}"><b>${i+1}</b>${x}</span>`).join('')}</div>`}
-function toast(text,type='success'){const id='toast-'+Date.now();document.body.insertAdjacentHTML('beforeend',`<div id="${id}" class="${type}" style="position:fixed;right:18px;top:88px;z-index:150;max-width:390px;box-shadow:var(--shadow)">${esc(text)}</div>`);setTimeout(()=>document.getElementById(id)?.remove(),3500)}
+function toast(text,type='success'){
+  if(!text)return;
+
+  const validTypes=['success','warning','error','info'];
+  const kind=validTypes.includes(type)?type:'info';
+
+  let stack=document.getElementById('central-toast-stack');
+
+  if(!stack){
+    stack=document.createElement('div');
+    stack.id='central-toast-stack';
+    stack.setAttribute('aria-live','polite');
+    stack.setAttribute('aria-atomic','false');
+    document.body.appendChild(stack);
+  }
+
+  const item=document.createElement('div');
+  item.className=`central-toast central-toast--${kind}`;
+  item.setAttribute('role',kind==='error'?'alert':'status');
+
+  item.innerHTML=`
+    <span class="central-toast-indicator"></span>
+    <span class="central-toast-text">${esc(text)}</span>
+  `;
+
+  stack.appendChild(item);
+
+  requestAnimationFrame(()=>{
+    item.classList.add('show');
+  });
+
+  const remove=()=>{
+    item.classList.remove('show');
+    setTimeout(()=>{
+      item.remove();
+      if(stack&&!stack.children.length)stack.remove();
+    },180);
+  };
+
+  setTimeout(remove,3800);
+}
 
 // IndexedDB: fotos de perfil, registros, fotos de manutenção e rascunhos.
 let dbPromise;
@@ -668,7 +708,30 @@ window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqw
 const cloudClient=window.supabase?.createClient(window.CENTRAL_CLOUD_CONFIG.supabaseUrl,window.CENTRAL_CLOUD_CONFIG.supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let pendingVerificationEmail=localStorage.getItem('central_pending_verification_email')||'';
 
-function authMessage(text,type='info'){const box=document.getElementById('auth-message');if(!box)return;box.innerHTML=text?`<div class="auth-message ${type}">${esc(text)}</div>`:''}
+function authMessage(text,type='info'){
+  const box=document.getElementById('auth-message');
+  if(!box)return;
+
+  if(!text){
+    box.innerHTML='';
+    return;
+  }
+
+  /* Erros de preenchimento continuam junto do formulário. */
+  if(type==='error'){
+    box.innerHTML=`<div class="auth-message error">${esc(text)}</div>`;
+    return;
+  }
+
+  /* Sucessos e avisos transitórios passam para o canto superior direito. */
+  box.innerHTML='';
+  toast(
+    text,
+    type==='success'?'success':
+    type==='warning'?'warning':
+    'info'
+  );
+}
 function setAuthBusy(form,busy,label){const button=form?.querySelector('button[type="submit"]');if(!button)return;if(!button.dataset.label)button.dataset.label=button.textContent;button.disabled=busy;button.textContent=busy?label:button.dataset.label}
 function isValidAccountEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email||'').trim().toLowerCase())}
 function showAuthTab(name){if(name==='verify'&&!pendingVerificationEmail)name='signup';const activeTab=(name==='verify'||name==='invite')?'signup':name;document.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active',b.dataset.authTab===activeTab));document.querySelectorAll('[data-auth-pane]').forEach(p=>p.classList.toggle('active',p.dataset.authPane===name));if(name==='verify'){document.getElementById('verify-email-target').textContent=pendingVerificationEmail||'Informe o e-mail na etapa anterior'}authMessage('')}
