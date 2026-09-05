@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.8'}};
-const APP_VERSION='1.9.8';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.9'}};
+const APP_VERSION='1.9.9';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.8.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.9.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1768,8 +1768,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.8';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.8';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='1.9.9';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1850,7 +1850,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.8';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';
 };
 
 
@@ -1938,7 +1938,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.8';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.8'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2030,8 +2030,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.8';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.8';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3033,6 +3033,15 @@ renderUserManagement=async function(...args){
   });
 
   requestAnimationFrame(syncAdaptiveHeader);
+};
+
+
+/* ===== v1.9.9 — atmosfera visual da Home ===== */
+const _v199SetActiveNav=setActiveNav;
+setActiveNav=function(target){
+  const result=_v199SetActiveNav(target);
+  document.body.classList.toggle('v199-home-atmosphere',target==='home');
+  return result;
 };
 
 (async()=>{

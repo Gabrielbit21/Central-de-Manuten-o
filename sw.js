@@ -1,4 +1,4 @@
-const SW_VERSION = '1.9.8-media-v4.2';
+const SW_VERSION = '1.9.9-media-v4.2';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -124,4 +124,3 @@ self.addEventListener('notificationclick', event => {
     return self.clients.openWindow(targetUrl);
   })());
 });
-
