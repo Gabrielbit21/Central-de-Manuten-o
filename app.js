@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'1.9.9'}};
-const APP_VERSION='1.9.9';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'2.0.0'}};
+const APP_VERSION='2.0.0';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v1.9.9.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v2.0.0.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1768,8 +1768,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='1.9.9';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='2.0.0';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1850,7 +1850,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';
 };
 
 
@@ -1938,7 +1938,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2030,8 +2030,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v1.9.9';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v1.9.9';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3041,6 +3041,347 @@ const _v199SetActiveNav=setActiveNav;
 setActiveNav=function(target){
   const result=_v199SetActiveNav(target);
   document.body.classList.toggle('v199-home-atmosphere',target==='home');
+  return result;
+};
+
+
+/* ===== v2.0.0 — fundação multi-frente e equipe executante padronizada ===== */
+state.businessFront = state.businessFront || null;
+state.businessFronts = state.businessFronts || [
+  {code:'substation',label:'Subestações',active:true,sort_order:10},
+  {code:'distribution',label:'Distribuição',active:false,sort_order:20},
+  {code:'telecom',label:'Telecom',active:false,sort_order:30}
+];
+state.personnelDirectory = state.personnelDirectory || [];
+state.reportParticipants = state.reportParticipants || new Map();
+state.currentPersonnelId = state.currentPersonnelId || null;
+state.maintenanceParticipants = state.maintenanceParticipants || [];
+
+function v200FrontMeta(code){
+  const meta={
+    substation:{
+      title:'Subestações',
+      icon:'settings',
+      description:'Manutenção em ativos instalados em subestações. Esta frente utiliza a base atualmente disponível.',
+      available:'Disponível'
+    },
+    distribution:{
+      title:'Distribuição',
+      icon:'exchange',
+      description:'Preparada para manutenções em religadores da rede de distribuição.',
+      available:'Em preparação'
+    },
+    telecom:{
+      title:'Telecom',
+      icon:'wifi',
+      description:'Preparada para repetidoras e equipamentos de comunicação, inclusive os instalados em subestações.',
+      available:'Em preparação'
+    }
+  };
+  return meta[code]||{title:code,icon:'settings',description:'Frente de negócio.',available:'Em preparação'};
+}
+
+function renderBusinessFrontSelector(){
+  state.screen='business-front';
+  setActiveNav('maintenance');
+  const fronts=[...(state.businessFronts||[])].sort((a,b)=>Number(a.sort_order||100)-Number(b.sort_order||100));
+  main.innerHTML=`<section class="business-front-shell">
+    <div class="head-row business-front-head">
+      <div>
+        <button class="back" id="front-back-home" type="button" aria-label="Voltar ao início" title="Voltar ao início"><span data-icon="arrow-left"></span></button>
+        <h1>Nova Manutenção</h1>
+        <p>Escolha a frente de negócio. As novas frentes já estão previstas na arquitetura, mas permanecem bloqueadas até a publicação das respectivas bases.</p>
+      </div>
+    </div>
+    <div class="business-front-grid">
+      ${fronts.map(front=>{
+        const meta=v200FrontMeta(front.code),enabled=front.code==='substation'&&front.active!==false;
+        return `<button class="business-front-card" type="button" data-front="${esc(front.code)}" ${enabled?'':'disabled'} aria-disabled="${enabled?'false':'true'}">
+          <span class="business-front-icon" data-icon="${esc(meta.icon)}"></span>
+          <h2>${esc(meta.title)}</h2>
+          <p>${esc(meta.description)}</p>
+          <span class="business-front-state">${enabled?'<span data-icon="check"></span>':'<span data-icon="lock"></span>'}${esc(enabled?'Disponível':meta.available)}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    <div class="business-front-note">A frente de negócio é independente do local físico. No futuro, equipamentos de Telecom poderão estar associados tanto a repetidoras quanto a subestações.</div>
+  </section>`;
+  hydrateIcons(main);
+  document.getElementById('front-back-home').onclick=()=>{state.businessFront=null;renderHome()};
+  main.querySelectorAll('.business-front-card:not(:disabled)').forEach(button=>button.onclick=()=>{
+    state.businessFront=button.dataset.front;
+    _v200RenderSubstations();
+  });
+}
+
+const _v200RenderSubstations=renderSubstations;
+renderSubstations=async function(){
+  if(!state.businessFront)return renderBusinessFrontSelector();
+  if(state.businessFront!=='substation'){
+    toast('Esta frente ainda está em preparação.','notice');
+    state.businessFront=null;
+    return renderBusinessFrontSelector();
+  }
+  return _v200RenderSubstations();
+};
+
+const _v200ResetMaintenanceFlow=resetMaintenanceFlow;
+resetMaintenanceFlow=function(){
+  _v200ResetMaintenanceFlow();
+  state.businessFront=null;
+  state.maintenanceParticipants=[];
+};
+
+const _v200NavigateTo=navigateTo;
+navigateTo=function(nav){
+  const maintenanceScreens=['business-front','substations','equipment','review','activity','submission-review'];
+  if(nav==='maintenance'&&!maintenanceScreens.includes(state.screen)){
+    resetMaintenanceFlow();
+    return renderBusinessFrontSelector();
+  }
+  return _v200NavigateTo(nav);
+};
+
+/* Diretório de colaboradores e vínculos de participação.
+   O carregamento é complementar para manter o modo offline existente. */
+function v200AuxCacheKey(){
+  return state.cloudUser?.id?`v200-directory:${state.cloudUser.id}`:'v200-directory:anonymous';
+}
+function applyV200Auxiliary(data={}){
+  state.businessFronts=(data.businessFronts?.length?data.businessFronts:state.businessFronts)||[];
+  state.personnelDirectory=(data.personnel||[]).filter(x=>x.active!==false);
+  state.reportParticipants=new Map();
+  for(const row of (data.participants||[])){
+    if(!state.reportParticipants.has(row.report_id))state.reportParticipants.set(row.report_id,[]);
+    state.reportParticipants.get(row.report_id).push(row.personnel_id);
+  }
+  const own=data.currentProfilePersonnelId||null;
+  state.currentPersonnelId=own;
+  if(state.cloudProfile)state.cloudProfile.personnel_id=own;
+}
+async function loadV200Auxiliary(){
+  const key=v200AuxCacheKey();
+  if(!navigator.onLine){
+    const cached=await idbGet('cloudCache',key);
+    if(cached?.data)applyV200Auxiliary(cached.data);
+    return;
+  }
+  try{
+    const [fronts,personnel,participants,profileLink]=await Promise.all([
+      paginatedSelect('business_fronts','code,label,active,sort_order','sort_order'),
+      paginatedSelect('personnel','id,display_name,employee_code,active,created_at','display_name'),
+      paginatedSelect('maintenance_report_participants','report_id,personnel_id,position','report_id'),
+      cloudClient.from('profiles').select('personnel_id').eq('id',state.cloudUser.id).single()
+    ]);
+    const data={
+      businessFronts:fronts||[],
+      personnel:personnel||[],
+      participants:participants||[],
+      currentProfilePersonnelId:profileLink?.data?.personnel_id||null
+    };
+    await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null});
+    applyV200Auxiliary(data);
+  }catch(error){
+    console.warn('v2.0.0 diretório de colaboradores:',error?.message||error);
+    const cached=await idbGet('cloudCache',key);
+    if(cached?.data)return applyV200Auxiliary(cached.data);
+    /* Fallback seguro durante homologação: usa o diretório de perfis
+       somente para não bloquear leitura da versão anterior à migration. */
+    const fallback=(state.profileDirectory||[]).filter(x=>x.active!==false).map(x=>({
+      id:x.id,display_name:x.display_name||'Usuário',employee_code:null,active:true,legacy_profile:true
+    }));
+    applyV200Auxiliary({personnel:fallback,currentProfilePersonnelId:state.cloudUser?.id||null});
+  }
+}
+const _v200LoadCloudSnapshot=loadCloudSnapshot;
+loadCloudSnapshot=async function(...args){
+  const result=await _v200LoadCloudSnapshot(...args);
+  await loadV200Auxiliary();
+  return result;
+};
+
+function v200PersonnelById(id){
+  return (state.personnelDirectory||[]).find(p=>String(p.id)===String(id))||null;
+}
+function v200ParticipantNames(ids=state.maintenanceParticipants){
+  return (ids||[]).map(v200PersonnelById).filter(Boolean).map(p=>p.display_name);
+}
+function v200MatchNamesFromLegacy(text=''){
+  if(!text)return[];
+  const normalizedParts=String(text).split(/\s*(?:\/|,|;|\+|&|\be\b)\s*/i).map(normalize).filter(Boolean);
+  const out=[];
+  for(const p of (state.personnelDirectory||[])){
+    if(normalizedParts.includes(normalize(p.display_name)))out.push(p.id);
+  }
+  return out.slice(0,3);
+}
+async function v200InitialParticipantIds(form){
+  if(state.maintenanceParticipants?.length)return [...state.maintenanceParticipants];
+  let ids=[];
+  if(state.activeDraftId){
+    const draft=await idbGet('drafts',state.activeDraftId);
+    if(Array.isArray(draft?.form?.participantIds))ids=draft.form.participantIds;
+    if(!state.businessFront&&draft?.form?.businessFront)state.businessFront=draft.form.businessFront;
+  }
+  if(!ids.length&&state.editingRecordId){
+    ids=[...(state.reportParticipants.get(state.editingRecordId)||[])];
+    if(!state.businessFront&&state.editingOriginal?.form?.businessFront)state.businessFront=state.editingOriginal.form.businessFront;
+  }
+  if(!ids.length&&Array.isArray(state.reviewPayload?.formData?.participantIds))ids=state.reviewPayload.formData.participantIds;
+  if(!ids.length&&form?.elements?.equipe?.value)ids=v200MatchNamesFromLegacy(form.elements.equipe.value);
+  if(!ids.length&&state.currentPersonnelId)ids=[state.currentPersonnelId];
+  if(!ids.length){
+    const currentName=normalize(state.cloudProfile?.display_name||'');
+    const match=(state.personnelDirectory||[]).find(p=>normalize(p.display_name)===currentName);
+    if(match)ids=[match.id];
+  }
+  return [...new Set(ids.map(String))].filter(id=>v200PersonnelById(id)).slice(0,3);
+}
+function renderV200TeamPicker(form){
+  const chips=document.getElementById('v200-team-chips');
+  const select=document.getElementById('v200-team-select');
+  const hidden=form?.elements?.equipe;
+  if(!chips||!select||!hidden)return;
+  const ids=[...(state.maintenanceParticipants||[])];
+  chips.innerHTML=ids.length?ids.map(id=>{
+    const person=v200PersonnelById(id);
+    return `<span class="v200-team-chip">${esc(person?.display_name||'Colaborador')}<button type="button" data-remove-person="${esc(id)}" aria-label="Remover ${esc(person?.display_name||'colaborador')}"><span data-icon="x"></span></button></span>`;
+  }).join(''):'<span class="v200-team-empty">Nenhum integrante selecionado.</span>';
+  const selected=new Set(ids.map(String));
+  const available=(state.personnelDirectory||[]).filter(p=>!selected.has(String(p.id)));
+  select.innerHTML=`<option value="">Adicionar colaborador…</option>${available.map(p=>`<option value="${esc(p.id)}">${esc(p.display_name)}${p.employee_code?` · ${esc(p.employee_code)}`:''}</option>`).join('')}`;
+  select.disabled=!available.length||ids.length>=3;
+  const names=v200ParticipantNames(ids);
+  hidden.value=names.join(' / ');
+  chips.querySelectorAll('[data-remove-person]').forEach(button=>button.onclick=()=>{
+    state.maintenanceParticipants=state.maintenanceParticipants.filter(id=>String(id)!==button.dataset.removePerson);
+    renderV200TeamPicker(form);
+    form.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  hydrateIcons(chips);
+}
+async function setupV200TeamPicker(form){
+  const old=form?.querySelector('input[name="equipe"]');
+  if(!old)return;
+  const field=old.closest('.field');
+  if(!field)return;
+  const previous=old.value||'';
+  field.classList.add('full','v200-team-field');
+  field.innerHTML=`<label>${requiredLabel('Equipe executante')}</label>
+    <div class="v200-team-box">
+      <input type="hidden" name="equipe" value="${esc(previous)}">
+      <div class="v200-team-chips" id="v200-team-chips"></div>
+      <div class="v200-team-add">
+        <select id="v200-team-select" aria-label="Selecionar colaborador"></select>
+        <button class="btn secondary" id="v200-team-add" type="button">Adicionar integrante</button>
+      </div>
+      <p class="v200-team-help">Selecione de 1 a 3 colaboradores do cadastro oficial. O integrante não precisa possuir conta no sistema. A ordem dos nomes não altera a identificação da equipe.</p>
+    </div>`;
+  state.maintenanceParticipants=await v200InitialParticipantIds(form);
+  renderV200TeamPicker(form);
+  const add=document.getElementById('v200-team-add'),select=document.getElementById('v200-team-select');
+  add.onclick=()=>{
+    const id=select.value;
+    if(!id)return;
+    if(state.maintenanceParticipants.length>=3)return toast('A equipe pode ter no máximo três integrantes.','notice');
+    if(!state.maintenanceParticipants.includes(id))state.maintenanceParticipants.push(id);
+    renderV200TeamPicker(form);
+    form.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+}
+
+const _v200RenderActivity=renderActivity;
+renderActivity=async function(...args){
+  if(!state.businessFront)state.businessFront='substation';
+  await _v200RenderActivity(...args);
+  const form=document.getElementById('form');
+  if(form)await setupV200TeamPicker(form);
+  const heading=document.querySelector('.head-row h2');
+  if(heading&&!document.querySelector('.v200-front-badge')){
+    heading.insertAdjacentHTML('afterend','<span class="v200-front-badge"><span data-icon="settings"></span> Subestações</span>');
+    hydrateIcons(heading.parentElement);
+  }
+};
+
+const _v200FormSnapshot=formSnapshot;
+formSnapshot=function(form){
+  const data=_v200FormSnapshot(form);
+  const ids=[...(state.maintenanceParticipants||[])];
+  const names=v200ParticipantNames(ids);
+  data.businessFront=state.businessFront||'substation';
+  data.participantIds=ids;
+  if(names.length)data.equipe=names.join(' / ');
+  return data;
+};
+
+const _v200SubmitMaintenance=submitMaintenance;
+submitMaintenance=async function(ev,form,sel){
+  if(!(state.maintenanceParticipants||[]).length){
+    ev?.preventDefault?.();
+    toast('Selecione pelo menos um integrante da equipe executante.','warning');
+    document.getElementById('v200-team-select')?.focus();
+    return;
+  }
+  return _v200SubmitMaintenance(ev,form,sel);
+};
+
+/* Sincroniza a relação normalizada dos integrantes sem depender da existência
+   de conta de usuário para cada pessoa. */
+const _v200EnsureReportChildren=ensureReportChildren;
+ensureReportChildren=async function(record,user){
+  await _v200EnsureReportChildren(record,user);
+  const ids=[...new Set((record.form?.participantIds||[]).map(String))].filter(Boolean).slice(0,3);
+  if(!ids.length)return;
+  try{
+    const {error:deleteError}=await cloudClient.from('maintenance_report_participants').delete().eq('report_id',record.id);
+    if(deleteError)throw deleteError;
+    const rows=ids.map((personnel_id,index)=>({report_id:record.id,personnel_id,position:index+1}));
+    const {error:insertError}=await cloudClient.from('maintenance_report_participants').insert(rows);
+    if(insertError&&insertError.code!=='23505')throw insertError;
+  }catch(error){
+    console.warn('v2.0.0 participantes:',error?.message||error);
+    if(error?.code!=='42P01')throw error;
+  }
+};
+
+/* Meus Relatórios: autor OU integrante da equipe.
+   O histórico geral dos ativos continua intacto e compartilhado para consulta operacional. */
+injectMyReportsOnHome=async function(){
+  if(state.role!=='field'||!state.cloudUser)return;
+  document.querySelector('.my-reports-section')?.remove();
+  document.querySelector('.recent-local')?.remove();
+  const anchor=document.querySelector('.action-section');
+  if(!anchor)return;
+
+  const all=await combinedReports(),uid=state.cloudUser.id,personnelId=state.currentPersonnelId;
+  const own=all.filter(report=>{
+    if(report.source==='imported')return false;
+    const raw=report.raw||{},localIds=raw.form?.participantIds||raw.participantIds||[];
+    const cloudIds=state.reportParticipants.get(report.id)||[];
+    return raw.usuario?.id===uid||
+      raw.authorId===uid||
+      raw.author_id===uid||
+      belongsToCurrentUser(raw)||
+      (!!personnelId&&localIds.map(String).includes(String(personnelId)))||
+      (!!personnelId&&cloudIds.map(String).includes(String(personnelId)));
+  });
+
+  const section=document.createElement('section');
+  section.className='panel my-reports-section';
+  section.innerHTML=`<div class="my-reports-head"><div><h2>Meus Relatórios</h2><p>Atendimentos registrados por você ou dos quais você participou.</p></div><span class="my-reports-count">${own.length} relatório(s)</span></div>
+    <div class="my-reports-list">${own.length?own.map(report=>`<button class="my-report-item" type="button" data-my-report-key="${esc(report.key)}"><span class="my-report-main"><strong>${esc(report.number||'Relatório')}</strong><span>${esc(report.type)} · ${esc(report.substation)}</span><small>${esc(report.assets.join(', ')||'Ativo não informado')}</small></span><span class="my-report-meta">${statusPill(report.status)}<time>${esc(formatDate(report.date))}</time></span></button>`).join(''):'<div class="empty">Você ainda não possui relatórios registrados ou vinculados à sua participação.</div>'}</div>`;
+  anchor.insertAdjacentElement('afterend',section);
+  section.querySelectorAll('[data-my-report-key]').forEach(button=>button.onclick=async()=>{
+    state.reports=await combinedReports();
+    await openReportDetails(button.dataset.myReportKey);
+  });
+};
+
+/* Estado visual da Home v2.0.0 */
+const _v200SetActiveNav=setActiveNav;
+setActiveNav=function(target){
+  const result=_v200SetActiveNav(target);
+  document.body.classList.toggle('v200-home-atmosphere',target==='home');
   return result;
 };
 
