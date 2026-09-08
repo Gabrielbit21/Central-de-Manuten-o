@@ -1580,6 +1580,7 @@ function vapidKeyBytes(value){
   const raw=atob(base64),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;
 }
 async function registerCentralServiceWorker(){
+  if(globalThis.__CENTRAL_ANDROID_NATIVE__===true)return null;
   if(!('serviceWorker' in navigator))return null;
   if(location.protocol!=='https:'&&location.hostname!=='localhost')return null;
   try{
@@ -3493,14 +3494,38 @@ openApproveUserDialog=function(user){
     if(isField&&!personnelId)return toast('Selecione o técnico de campo correspondente a esta conta.','warning');
     const button=document.getElementById('confirm-approve-user');
     button.disabled=true;button.textContent='Aprovando…';
+    let previousPersonnelId=null;
+    let personnelLinked=false;
     try{
       if(isField){
+        const {data:previousProfile,error:previousProfileError}=await cloudClient.from('profiles').select('personnel_id').eq('id',user.id).single();
+        if(previousProfileError)throw previousProfileError;
+        previousPersonnelId=previousProfile?.personnel_id||null;
         const {error:linkError}=await cloudClient.rpc('admin_link_profile_personnel',{p_profile_id:user.id,p_personnel_id:personnelId});
         if(linkError)throw linkError;
+        personnelLinked=true;
       }
       await adminUsersInvoke({action:'approve',user_id:user.id,whatsapp_number:whatsapp});
-      close();toast('Acesso aprovado e colaborador vinculado.');await renderUserManagement();
-    }catch(error){button.disabled=false;button.textContent='Aprovar acesso';toast(error.message||String(error),'warning')}
+      close();toast(isField?'Acesso aprovado e colaborador vinculado.':'Acesso aprovado.');await renderUserManagement();
+    }catch(error){
+      let approvalConfirmed=false;
+      if(isField&&personnelLinked){
+        try{
+          const {data:currentProfile,error:statusError}=await cloudClient.from('profiles').select('active,approval_status,personnel_id').eq('id',user.id).single();
+          if(!statusError&&currentProfile){
+            approvalConfirmed=currentProfile.active===true&&currentProfile.approval_status==='approved';
+            if(!approvalConfirmed){
+              const {error:rollbackError}=await cloudClient.rpc('admin_link_profile_personnel',{p_profile_id:user.id,p_personnel_id:previousPersonnelId});
+              if(rollbackError)console.error('v2.0.1 rollback de vínculo:',rollbackError);
+            }
+          }
+        }catch(recoveryError){
+          console.error('v2.0.1 verificação pós-aprovação:',recoveryError);
+        }
+      }
+      if(approvalConfirmed){close();toast('Acesso aprovado e colaborador vinculado.');await renderUserManagement();return}
+      button.disabled=false;button.textContent='Aprovar acesso';toast(error.message||String(error),'warning');
+    }
   };
 };
 
