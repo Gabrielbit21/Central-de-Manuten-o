@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'2.0.0'}};
-const APP_VERSION='2.0.0';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'2.0.1'}};
+const APP_VERSION='2.0.1';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v2.0.0.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v2.0.1.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1580,6 +1580,7 @@ function vapidKeyBytes(value){
   const raw=atob(base64),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;
 }
 async function registerCentralServiceWorker(){
+  if(globalThis.__CENTRAL_ANDROID_NATIVE__===true)return null;
   if(!('serviceWorker' in navigator))return null;
   if(location.protocol!=='https:'&&location.hostname!=='localhost')return null;
   try{
@@ -1768,8 +1769,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='2.0.0';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.1';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='2.0.1';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1850,7 +1851,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.1';
 };
 
 
@@ -1938,7 +1939,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.1';const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.1'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2030,8 +2031,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.0';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.0';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v2.0.1';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v2.0.1';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3045,7 +3046,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v2.0.0 — fundação multi-frente e equipe executante padronizada ===== */
+/* ===== v2.0.1 — fundação multi-frente e equipe executante padronizada ===== */
 state.businessFront = state.businessFront || null;
 state.businessFronts = state.businessFronts || [
   {code:'substation',label:'Subestações',active:true,sort_order:10},
@@ -3090,7 +3091,7 @@ function renderBusinessFrontSelector(){
       <div>
         <button class="back" id="front-back-home" type="button" aria-label="Voltar ao início" title="Voltar ao início"><span data-icon="arrow-left"></span></button>
         <h1>Nova Manutenção</h1>
-        <p>Escolha a frente de negócio. As novas frentes já estão previstas na arquitetura, mas permanecem bloqueadas até a publicação das respectivas bases.</p>
+        <p>Escolha a frente de negócio. Algumas opções ainda estão indisponíveis.</p>
       </div>
     </div>
     <div class="business-front-grid">
@@ -3104,7 +3105,6 @@ function renderBusinessFrontSelector(){
         </button>`;
       }).join('')}
     </div>
-    <div class="business-front-note">A frente de negócio é independente do local físico. No futuro, equipamentos de Telecom poderão estar associados tanto a repetidoras quanto a subestações.</div>
   </section>`;
   hydrateIcons(main);
   document.getElementById('front-back-home').onclick=()=>{state.businessFront=null;renderHome()};
@@ -3149,7 +3149,7 @@ function v200AuxCacheKey(){
 }
 function applyV200Auxiliary(data={}){
   state.businessFronts=(data.businessFronts?.length?data.businessFronts:state.businessFronts)||[];
-  state.personnelDirectory=(data.personnel||[]).filter(x=>x.active!==false);
+  state.personnelDirectory=(data.personnel||[]).filter(x=>x.active!==false&&(x.is_field_technician===true||x.legacy_profile===true));
   state.reportParticipants=new Map();
   for(const row of (data.participants||[])){
     if(!state.reportParticipants.has(row.report_id))state.reportParticipants.set(row.report_id,[]);
@@ -3169,7 +3169,7 @@ async function loadV200Auxiliary(){
   try{
     const [fronts,personnel,participants,profileLink]=await Promise.all([
       paginatedSelect('business_fronts','code,label,active,sort_order','sort_order'),
-      paginatedSelect('personnel','id,display_name,employee_code,active,created_at','display_name'),
+      paginatedSelect('personnel','id,display_name,employee_code,active,is_field_technician,created_at','display_name'),
       paginatedSelect('maintenance_report_participants','report_id,personnel_id,position','report_id'),
       cloudClient.from('profiles').select('personnel_id').eq('id',state.cloudUser.id).single()
     ]);
@@ -3182,12 +3182,12 @@ async function loadV200Auxiliary(){
     await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null});
     applyV200Auxiliary(data);
   }catch(error){
-    console.warn('v2.0.0 diretório de colaboradores:',error?.message||error);
+    console.warn('v2.0.1 diretório de colaboradores:',error?.message||error);
     const cached=await idbGet('cloudCache',key);
     if(cached?.data)return applyV200Auxiliary(cached.data);
     /* Fallback seguro durante homologação: usa o diretório de perfis
        somente para não bloquear leitura da versão anterior à migration. */
-    const fallback=(state.profileDirectory||[]).filter(x=>x.active!==false).map(x=>({
+    const fallback=(state.profileDirectory||[]).filter(x=>x.active!==false&&x.role!=='admin').map(x=>({
       id:x.id,display_name:x.display_name||'Usuário',employee_code:null,active:true,legacy_profile:true
     }));
     applyV200Auxiliary({personnel:fallback,currentProfilePersonnelId:state.cloudUser?.id||null});
@@ -3339,7 +3339,7 @@ ensureReportChildren=async function(record,user){
     const {error:insertError}=await cloudClient.from('maintenance_report_participants').insert(rows);
     if(insertError&&insertError.code!=='23505')throw insertError;
   }catch(error){
-    console.warn('v2.0.0 participantes:',error?.message||error);
+    console.warn('v2.0.1 participantes:',error?.message||error);
     if(error?.code!=='42P01')throw error;
   }
 };
@@ -3377,7 +3377,7 @@ injectMyReportsOnHome=async function(){
   });
 };
 
-/* Estado visual da Home v2.0.0 */
+/* Estado visual da Home v2.0.1 */
 const _v200SetActiveNav=setActiveNav;
 setActiveNav=function(target){
   const result=_v200SetActiveNav(target);
@@ -3385,7 +3385,136 @@ setActiveNav=function(target){
   return result;
 };
 
-(async()=>{
-  await registerCentralServiceWorker();
+
+/* ===== v2.0.1 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
+
+function v201AssetHistoryCacheKey(assetId){
+  const uid=state.cloudUser?.id||'anonymous';
+  return `asset-history:${uid}:${assetId}`;
+}
+function v201RpcHistoryToLocal(row,asset){
+  const payload=row?.payload&&typeof row.payload==='object'?row.payload:{};
+  const participants=Array.isArray(row?.participant_names)?row.participant_names.filter(Boolean):[];
+  if(payload.historical_import){
+    const raw=cloudHistoricalPayloadToLocal(payload);
+    return {
+      ...raw,
+      id:row.report_id,
+      status:row.status,
+      source:'asset-history-rpc',
+      assetIds:[asset.id],
+      equipe:raw.equipe||participants.join(' / ')||row.author_name||'Equipe'
+    };
+  }
+  const form=payload.form&&typeof payload.form==='object'?payload.form:{};
+  const snapshots=Array.isArray(payload.equipamentosSnapshot)?payload.equipamentosSnapshot:[];
+  const assetNames=snapshots.map(assetTitle).filter(Boolean);
+  return {
+    id:row.report_id,
+    data:form.data||row.created_at,
+    os:form.os||'',
+    equipe:participants.join(' / ')||form.equipe||row.author_name||'Equipe',
+    tipoManutencao:form.tipo||'Manutenção',
+    ativo:assetNames.join(', ')||assetTitle(asset)||'Ativo não informado',
+    serial:snapshots.map(a=>a?.serial).filter(Boolean).join(' / '),
+    defeito:form.defeito||'',
+    causa:form.causa||'',
+    reparo:form.reparo||'',
+    configuracao:form.configuracao||'',
+    pecaSubstituida:form.peca||'',
+    comentarios:form.comentarios||form.motivoInconclusao||'',
+    necessitaRetorno:form.retorno||'',
+    status:row.status,
+    source:'asset-history-rpc',
+    assetIds:[asset.id]
+  };
+}
+async function v201FullAssetHistory(asset,subId=state.sub){
+  if(!asset)return[];
+  if(state.role==='admin')return historyForAsset(asset,subId).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+  const key=v201AssetHistoryCacheKey(asset.id);
+  if(navigator.onLine&&cloudClient&&state.cloudUser){
+    try{
+      const {data,error}=await cloudClient.rpc('get_asset_maintenance_history',{p_asset_id:asset.id});
+      if(error)throw error;
+      const rows=(data||[]).map(row=>v201RpcHistoryToLocal(row,asset));
+      await idbPut('cloudCache',{key,data:rows,updatedAt:new Date().toISOString(),userId:state.cloudUser.id});
+      return rows;
+    }catch(error){
+      console.warn('v2.0.1 histórico do ativo:',error?.message||error);
+    }
+  }
+  const cached=await idbGet('cloudCache',key).catch(()=>null);
+  if(Array.isArray(cached?.data))return cached.data;
+  return historyForAsset(asset,subId).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+}
+function v201HistoryMarkup(hist){
+  return `<p class="muted" style="font-size:12px">Histórico exclusivo do ativo em atendimento.</p><div class="history">${hist.length?hist.map(r=>`<article class="history-card"><div class="date">${formatDate(r.data)} · ${esc(r.os||'Sem OS')}</div><h4>${esc(r.tipoManutencao||'Atendimento')} — ${esc(r.ativo||r.tipoEquipamento||'Ativo')}</h4>${r.status?`<span class="status-pill ${statusMeta(r.status).className}">${esc(statusMeta(r.status).label)}</span>`:''}${r.equipe?`<p><b>Equipe:</b> ${esc(r.equipe)}</p>`:''}${r.reparo?`<p><b>Reparo:</b> ${esc(r.reparo)}</p>`:''}${r.comentarios?`<p>${esc(r.comentarios)}</p>`:''}${r.pecaSubstituida?`<p><b>Peça:</b> ${esc(r.pecaSubstituida)}</p>`:''}</article>`).join(''):'<div class="empty">Sem histórico vinculado.</div>'}</div>`;
+}
+const _v201RenderSide=renderSide;
+renderSide=async function(hist,sel){
+  if(state.tab!=='history'||state.role!=='field'||!Array.isArray(sel)||!sel.length)return _v201RenderSide(hist,sel);
+  const side=document.getElementById('side-content');
+  if(!side)return;
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));
+  side.innerHTML='<div class="empty">Carregando histórico do ativo…</div>';
+  const fullHistory=await v201FullAssetHistory(sel[0],state.sub);
+  if(document.getElementById('side-content')===side&&state.tab==='history')side.innerHTML=v201HistoryMarkup(fullHistory);
+};
+
+const _v201OpenAssetDetails=openAssetDetails;
+openAssetDetails=async function(subId,assetId){
+  if(state.role!=='field')return _v201OpenAssetDetails(subId,assetId);
+  const asset=findAsset(subId,assetId);
+  if(!asset)return _v201OpenAssetDetails(subId,assetId);
+  const previous=DATA.histories[subId]||[];
+  const fullHistory=await v201FullAssetHistory(asset,subId);
+  const unrelated=previous.filter(row=>!historyMatchesAsset(row,asset));
+  DATA.histories[subId]=[...unrelated,...fullHistory];
+  try{return await _v201OpenAssetDetails(subId,assetId)}
+  finally{DATA.histories[subId]=previous}
+};
+
+async function v201ApproveUserInvoke(body){
+  if(!navigator.onLine)throw new Error('A aprovação de usuários exige conexão com a internet.');
+  const {data,error}=await cloudClient.functions.invoke('admin-approve-user',{body});
+  if(error){
+    let message=error.message||'Falha ao aprovar o acesso.';
+    try{if(error.context&&typeof error.context.json==='function'){const payload=await error.context.json();message=payload?.error||payload?.message||message}}catch(_){ }
+    throw new Error(message);
+  }
+  if(data?.error)throw new Error(data.error);
+  return data||{};
+}
+
+openApproveUserDialog=function(user){
+  if(!user)return;
+  const isField=(user.requested_role||user.role||'field')!=='admin';
+  const technicians=[...(state.personnelDirectory||[])].filter(p=>p.active!==false&&p.is_field_technician===true).sort((a,b)=>String(a.display_name).localeCompare(String(b.display_name),'pt-BR'));
+  const suggested=isField?technicians.find(p=>normalize(p.display_name)===normalize(user.display_name||'')):null;
+  const technicianField=isField?`<div class="field" style="margin-top:15px"><label>Técnico de campo *</label><select id="approve-user-personnel" required><option value="">Selecione o colaborador…</option>${technicians.map(p=>`<option value="${esc(p.id)}" ${suggested?.id===p.id?'selected':''}>${esc(p.display_name)}</option>`).join('')}</select><span class="whatsapp-field-note">O vínculo usa o cadastro oficial da equipe e evita variações de nome nos relatórios.</span></div>`:'';
+  document.getElementById('modal-root').innerHTML=`<div class="modal" id="approve-user-modal"><div class="modal-card rejection-dialog" style="max-width:600px"><button class="modal-close" id="close-approve-user"><span data-icon="x"></span></button><h2>Aprovar acesso</h2><p class="muted">${esc(user.display_name||user.email)} solicitou o perfil <b>${esc(requestedRoleLabel(user))}</b>.</p>${technicianField}<div class="field" style="margin-top:15px"><label>WhatsApp *</label><input id="approve-user-whatsapp" type="tel" inputmode="tel" required value="${esc(user.whatsapp_number||'')}" placeholder="(32) 99999-9999"><span class="whatsapp-field-note">Confirme o número antes de liberar o acesso.</span></div><div class="report-actions" style="margin-top:16px"><button type="button" class="btn secondary" id="cancel-approve-user">Cancelar</button><button type="button" class="btn primary" id="confirm-approve-user">Aprovar acesso</button></div></div></div>`;
+  hydrateIcons(document.getElementById('modal-root'));
+  const close=()=>document.getElementById('modal-root').innerHTML='';
+  document.getElementById('close-approve-user').onclick=close;
+  document.getElementById('cancel-approve-user').onclick=close;
+  document.getElementById('approve-user-modal').onclick=e=>{if(e.target===e.currentTarget)e.stopPropagation()};
+  document.getElementById('confirm-approve-user').onclick=async()=>{
+    const whatsapp=normalizeWhatsappInput(document.getElementById('approve-user-whatsapp').value);
+    if(!whatsapp)return toast('Informe um WhatsApp válido com DDD.','warning');
+    const personnelId=isField?document.getElementById('approve-user-personnel')?.value:'';
+    if(isField&&!personnelId)return toast('Selecione o técnico de campo correspondente a esta conta.','warning');
+    const button=document.getElementById('confirm-approve-user');
+    button.disabled=true;button.textContent='Aprovando…';
+    try{
+      await v201ApproveUserInvoke({user_id:user.id,whatsapp_number:whatsapp,personnel_id:isField?personnelId:null});
+      close();toast(isField?'Acesso aprovado e colaborador vinculado.':'Acesso aprovado.');await renderUserManagement();
+    }catch(error){
+      button.disabled=false;button.textContent='Aprovar acesso';toast(error.message||String(error),'warning');
+    }
+  };
+};
+
+(async()=>{  await registerCentralServiceWorker();
   if(await ensureCurrentBuild())bootConnectedApp();
 })();
