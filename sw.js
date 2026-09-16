@@ -1,4 +1,4 @@
-const SW_VERSION = '2.0.3-media-v4.5';
+const SW_VERSION = '2.0.5-media-v5.0';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -7,8 +7,14 @@ const APP_SHELL = [
   './version.json',
   './app.js',
   './assets/login-subestacao.jpg',
+  './assets/js/v205-preboot.js',
+  './assets/js/v205.js',
   './assets/js/media-core.js',
+  './assets/css/v205.css',
   './assets/css/media-core.css',
+  './assets/data/v205/front-assets.json',
+  './assets/data/v205/front-history.json',
+  './assets/data/v205/stats.json',
   './vendor/supabase-js-2.57.4.min.js',
   './vendor/xlsx-0.20.3.full.min.js',
   './assets/icons/icon-64.png',
@@ -42,12 +48,17 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navegação e código funcional crítico usam network-first.
-  // Assim uma atualização de app.js/media-core não fica presa ao shell antigo.
+  // Navegação, código funcional e bases offline críticas usam network-first.
+  // Assim a v2.0.5 não fica presa ao shell antigo e mantém fallback offline.
   const criticalCode = [
     '/app.js',
+    '/assets/js/v205-preboot.js',
+    '/assets/js/v205.js',
     '/assets/js/media-core.js',
+    '/assets/css/v205.css',
     '/assets/css/media-core.css',
+    '/assets/data/v205/front-assets.json',
+    '/assets/data/v205/front-history.json',
   ].some(path => url.pathname.endsWith(path));
   if (request.mode === 'navigate' || url.pathname.endsWith('/version.json') || criticalCode) {
     event.respondWith((async () => {

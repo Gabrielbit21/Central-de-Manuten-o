@@ -24,6 +24,8 @@ const rootFiles = [
   'version.json',
 ];
 
+// As bases v2.0.5 ficam sob assets/data/v205 e, portanto, viajam junto
+// com assets em PWA, Windows e Android.
 const rootDirectories = ['assets', 'vendor'];
 const mobileFiles = ['mobile-overrides.css'];
 
@@ -61,6 +63,23 @@ if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V4') || !mediaCoreText.includes(
 }
 new Function(mediaCoreText);
 
+// v2.0.5 precisa viajar junto com o bundle nativo e participar do token
+// de conteúdo para evitar reutilização acidental de arquivos antigos.
+const v205PrebootSource = join(repoRoot, 'assets', 'js', 'v205-preboot.js');
+const v205Source = join(repoRoot, 'assets', 'js', 'v205.js');
+const v205CssSource = join(repoRoot, 'assets', 'css', 'v205.css');
+for (const source of [v205PrebootSource, v205Source, v205CssSource]) {
+  if (!existsSync(source)) throw new Error(`Arquivo v2.0.5 obrigatório não encontrado: ${source}`);
+}
+const v205PrebootText = readFileSync(v205PrebootSource, 'utf8');
+const v205Text = readFileSync(v205Source, 'utf8');
+const v205CssText = readFileSync(v205CssSource, 'utf8');
+if (!v205Text.includes("const V205_VERSION='2.0.5'")) {
+  throw new Error('v205.js não identifica a versão 2.0.5.');
+}
+new Function(v205PrebootText);
+new Function(v205Text);
+
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
 const nativeBridgeText = readFileSync(nativeBridgeSource, 'utf8');
@@ -86,11 +105,12 @@ appText = appText.replace(
 writeFileSync(appPath, appText, 'utf8');
 
 // Token de conteúdo: cada mudança funcional gera nomes novos dentro do APK.
-// Mesmo que um WebView antigo ainda esteja temporariamente sob controle de um
-// Service Worker legado, os novos nomes não existem no cache antigo.
 const buildToken = createHash('sha256')
   .update(appText)
   .update(mediaCoreText)
+  .update(v205PrebootText)
+  .update(v205Text)
+  .update(v205CssText)
   .update(nativeBridgeText)
   .digest('hex')
   .slice(0, 12);
@@ -116,13 +136,18 @@ buildSync({
 
 const indexPath = join(webDir, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
+const prebootTag = '<script src="./assets/js/v205-preboot.js"></script>';
 const appTag = '<script src="./app.js"></script>';
+const v205Tag = '<script src="./assets/js/v205.js"></script>';
 const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 
-// Remove scripts genéricos: no Android usamos nomes content-addressed.
+// Remove scripts genéricos: no Android reordenamos o bootstrap para carregar
+// bridge nativa -> preboot 2.0.5 -> app principal -> 2.0.5 -> mídia.
 html = html
+  .replace(prebootTag, '')
   .replace(appTag, '')
+  .replace(v205Tag, '')
   .replace(mediaCoreTag, '')
   .replace('<script src="./mobile-native.js"></script>', '');
 
@@ -133,7 +158,9 @@ if (!html.includes(mobileCssTag)) {
 
 const nativeScripts = [
   `<script src="./${nativeBundleName}"></script>`,
+  prebootTag,
   `<script src="./${nativeAppName}"></script>`,
+  v205Tag,
   `<script src="./assets/js/${nativeMediaName}"></script>`,
 ].join('\n');
 
@@ -143,6 +170,8 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
+  appVersion: '2.0.5',
+  v205: 'enabled',
   mediaCore: '4.1.0',
   nativeBridge: '5.0.0',
   serviceWorker: 'disabled-in-native',

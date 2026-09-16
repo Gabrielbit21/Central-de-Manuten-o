@@ -1,0 +1,32 @@
+{
+  "asset_total": 1120,
+  "families": {
+    "distribution_recloser": 632,
+    "voltage_regulator": 151,
+    "claroty": 11,
+    "converter_125_12": 57,
+    "converter_125_12_detailed": 15,
+    "converter_125_48": 15,
+    "radio_data_uhf": 5,
+    "radio_microwave": 15,
+    "radio_voice_vhf": 57,
+    "repeater": 35,
+    "router": 63,
+    "telecom_site": 64
+  },
+  "history_total": 1904,
+  "history_matched": 1839,
+  "history_unmatched": 65,
+  "history_families": {
+    "distribution_recloser": 1799,
+    "voltage_regulator": 105
+  },
+  "unknown_relays": 241,
+  "relay_repeater_links": 252,
+  "telecom_unmapped_sites": [
+    "Chaveamento VRB",
+    "SE Canaa",
+    "SE Muriaé 3",
+    "Usina Cachoeira Encoberta"
+  ]
+}
