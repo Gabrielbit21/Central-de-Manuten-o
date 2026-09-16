@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v2.0.5
+/* Central de Manutenção SE — v2.0.6
  * Distribuição + Telecom + governança cadastral + offline resiliente.
  * Carregado depois do app principal para preservar compatibilidade com Subestações.
  */
@@ -7,7 +7,7 @@
   if(globalThis.__CENTRAL_V205__) return;
   globalThis.__CENTRAL_V205__=true;
 
-  const V205_VERSION='2.0.5';
+  const V205_VERSION='2.0.6';
   const OFFLINE_AUTH_MAX_MS=7*24*60*60*1000;
   const FRONT_CACHE_PREFIX='v205-front-assets:';
   const FRONT_LABELS={substation:'Subestação',distribution:'Distribuição',telecom:'Telecom'};

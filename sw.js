@@ -1,4 +1,4 @@
-const SW_VERSION = '2.0.5-media-v5.0';
+const SW_VERSION = '2.0.6-media-v6.0';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -9,8 +9,10 @@ const APP_SHELL = [
   './assets/login-subestacao.jpg',
   './assets/js/v205-preboot.js',
   './assets/js/v205.js',
+  './assets/js/v206.js',
   './assets/js/media-core.js',
   './assets/css/v205.css',
+  './assets/css/v206.css',
   './assets/css/media-core.css',
   './assets/data/v205/front-assets.json',
   './assets/data/v205/front-history.json',
@@ -48,14 +50,14 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navegação, código funcional e bases offline críticas usam network-first.
-  // Assim a v2.0.5 não fica presa ao shell antigo e mantém fallback offline.
   const criticalCode = [
     '/app.js',
     '/assets/js/v205-preboot.js',
     '/assets/js/v205.js',
+    '/assets/js/v206.js',
     '/assets/js/media-core.js',
     '/assets/css/v205.css',
+    '/assets/css/v206.css',
     '/assets/css/media-core.css',
     '/assets/data/v205/front-assets.json',
     '/assets/data/v205/front-history.json',
@@ -74,7 +76,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Bibliotecas locais, manifest e ícones: cache-first, com atualização em segundo plano.
   event.respondWith((async () => {
     const cached = await caches.match(request);
     if (cached) {
