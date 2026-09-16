@@ -24,8 +24,6 @@ const rootFiles = [
   'version.json',
 ];
 
-// As bases v2.0.5 ficam sob assets/data/v205 e, portanto, viajam junto
-// com assets em PWA, Windows e Android.
 const rootDirectories = ['assets', 'vendor'];
 const mobileFiles = ['mobile-overrides.css'];
 
@@ -50,9 +48,6 @@ for (const file of mobileFiles) {
   cpSync(source, join(webDir, file));
 }
 
-// A mesma camada de negócio é carregada em PWA, Windows e Android.
-// A diferença de plataforma fica isolada no CentralNativeAndroid, sem
-// interceptar input[type=file] nem concatenar patches ao app.js.
 const mediaCoreSource = join(repoRoot, 'assets', 'js', 'media-core.js');
 if (!existsSync(mediaCoreSource)) {
   throw new Error(`Camada compartilhada de mídia não encontrada: ${mediaCoreSource}`);
@@ -63,22 +58,28 @@ if (!mediaCoreText.includes('CENTRAL_MEDIA_CORE_V4') || !mediaCoreText.includes(
 }
 new Function(mediaCoreText);
 
-// v2.0.5 precisa viajar junto com o bundle nativo e participar do token
-// de conteúdo para evitar reutilização acidental de arquivos antigos.
 const v205PrebootSource = join(repoRoot, 'assets', 'js', 'v205-preboot.js');
 const v205Source = join(repoRoot, 'assets', 'js', 'v205.js');
 const v205CssSource = join(repoRoot, 'assets', 'css', 'v205.css');
-for (const source of [v205PrebootSource, v205Source, v205CssSource]) {
-  if (!existsSync(source)) throw new Error(`Arquivo v2.0.5 obrigatório não encontrado: ${source}`);
+const v206Source = join(repoRoot, 'assets', 'js', 'v206.js');
+const v206CssSource = join(repoRoot, 'assets', 'css', 'v206.css');
+for (const source of [v205PrebootSource, v205Source, v205CssSource, v206Source, v206CssSource]) {
+  if (!existsSync(source)) throw new Error(`Arquivo de camada funcional obrigatório não encontrado: ${source}`);
 }
 const v205PrebootText = readFileSync(v205PrebootSource, 'utf8');
 const v205Text = readFileSync(v205Source, 'utf8');
 const v205CssText = readFileSync(v205CssSource, 'utf8');
-if (!v205Text.includes("const V205_VERSION='2.0.5'")) {
-  throw new Error('v205.js não identifica a versão 2.0.5.');
+const v206Text = readFileSync(v206Source, 'utf8');
+const v206CssText = readFileSync(v206CssSource, 'utf8');
+if (!v205Text.includes("const V205_VERSION='2.0.6'")) {
+  throw new Error('v205.js precisa identificar a versão corrente 2.0.6.');
+}
+if (!v206Text.includes("const V206_VERSION = '2.0.6'")) {
+  throw new Error('v206.js não identifica a versão 2.0.6.');
 }
 new Function(v205PrebootText);
 new Function(v205Text);
+new Function(v206Text);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
@@ -90,8 +91,6 @@ if (nativeBridgeText.includes('installNativeImageInputBridge')) {
   throw new Error('native-bridge.js ainda contém interceptação global de input de imagem.');
 }
 
-// O APK não deve registrar Service Worker: os assets já são embarcados localmente.
-// Mantemos SW apenas em PWA; no Android ele causava cache persistente entre APKs.
 const appPath = join(webDir, 'app.js');
 let appText = readFileSync(appPath, 'utf8');
 const swFunctionMarker = 'async function registerCentralServiceWorker(){';
@@ -104,13 +103,14 @@ appText = appText.replace(
 );
 writeFileSync(appPath, appText, 'utf8');
 
-// Token de conteúdo: cada mudança funcional gera nomes novos dentro do APK.
 const buildToken = createHash('sha256')
   .update(appText)
   .update(mediaCoreText)
   .update(v205PrebootText)
   .update(v205Text)
   .update(v205CssText)
+  .update(v206Text)
+  .update(v206CssText)
   .update(nativeBridgeText)
   .digest('hex')
   .slice(0, 12);
@@ -139,15 +139,15 @@ let html = readFileSync(indexPath, 'utf8');
 const prebootTag = '<script src="./assets/js/v205-preboot.js"></script>';
 const appTag = '<script src="./app.js"></script>';
 const v205Tag = '<script src="./assets/js/v205.js"></script>';
+const v206Tag = '<script src="./assets/js/v206.js"></script>';
 const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 
-// Remove scripts genéricos: no Android reordenamos o bootstrap para carregar
-// bridge nativa -> preboot 2.0.5 -> app principal -> 2.0.5 -> mídia.
 html = html
   .replace(prebootTag, '')
   .replace(appTag, '')
   .replace(v205Tag, '')
+  .replace(v206Tag, '')
   .replace(mediaCoreTag, '')
   .replace('<script src="./mobile-native.js"></script>', '');
 
@@ -161,6 +161,7 @@ const nativeScripts = [
   prebootTag,
   `<script src="./${nativeAppName}"></script>`,
   v205Tag,
+  v206Tag,
   `<script src="./assets/js/${nativeMediaName}"></script>`,
 ].join('\n');
 
@@ -170,8 +171,9 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
-  appVersion: '2.0.5',
+  appVersion: '2.0.6',
   v205: 'enabled',
+  v206: 'enabled',
   mediaCore: '4.1.0',
   nativeBridge: '5.0.0',
   serviceWorker: 'disabled-in-native',
