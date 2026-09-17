@@ -115,8 +115,8 @@
   }
 
   function frontHistoryRows(asset) {
-    const code = normalized(asset?.operating_code).replace(/[^A-Z0-9]/g, '');
-    const legacy = (state?.frontHistory || []).filter(row => row.asset_id === asset?.id || (!row.asset_id && code && normalized(row.operating_code).replace(/[^A-Z0-9]/g,'') === code));
+    const code = normalized(asset?.operating_code).replace(/[^a-z0-9]/g, '');
+    const legacy = (state?.frontHistory || []).filter(row => row.asset_id === asset?.id || (!row.asset_id && code && normalized(row.operating_code).replace(/[^a-z0-9]/g,'') === code));
     return legacy.sort((a,b) => safe(b.occurred_on).localeCompare(safe(a.occurred_on)));
   }
 
@@ -326,6 +326,7 @@
   }
 
   function applyVersionChrome() {
+    if(globalThis.__CENTRAL_V300__)return;
     document.title = document.title.replace(/v\d+\.\d+\.\d+/i, `v${V206_VERSION}`);
     const footer = document.getElementById('environment-footer-version');
     if (footer) footer.textContent = `v${V206_VERSION}`;
@@ -362,14 +363,14 @@
   scheduleEnhancements();
 
   /* ===== v2.0.6 — consolidação visual e funcional final ===== */
-  const v206NormCode = value => normalized(value).replace(/[^A-Z0-9]/g, '');
+  const v206NormCode = value => normalized(value).replace(/[^a-z0-9]/g, '');
   const v206StatusClass = value => {
     const status=normalized(value);
-    if(status.includes('SUCATA'))return 'scrap';
-    if(status.includes('MANUTENCAO')||status.includes('FORA DE OPERACAO'))return 'warning';
-    if(status.includes('RESERVA'))return 'reserve';
-    if(status.includes('INATIVO')||status.includes('DESATIVADO'))return 'inactive';
-    if(status.includes('OPERACAO'))return 'ok';
+    if(status.includes('sucata')||(status.includes('fora')&&status.includes('operacao')))return 'scrap';
+    if(status.includes('manutencao'))return 'warning';
+    if(status.includes('reserva'))return 'reserve';
+    if(status.includes('inativo')||status.includes('desativado'))return 'inactive';
+    if(status.includes('operacao'))return 'ok';
     return '';
   };
 
@@ -775,7 +776,7 @@
     const browserKey=`distribution:${family}`;
 
     /*
-     * v3.0.2: não recriar a galeria a cada mutação interna do próprio browser.
+     * v3.0.3: não recriar a galeria a cada mutação interna do próprio browser.
      * O redraw dos filtros passa a ser responsabilidade exclusiva dos handlers
      * locais abaixo. Isso elimina o efeito de "mal contato" nos botões e <details>.
      */
@@ -848,24 +849,38 @@
     if(!button)return;const id=button.dataset.v205DbAsset||button.dataset.v205DbTelAsset||button.dataset.repeaterRelay||button.dataset.v206Relay||button.dataset.v206SubComm||button.dataset.v206DbFrontAsset;const asset=assetById(id);if(!asset)return;event.preventDefault();event.stopImmediatePropagation();openV206FrontAssetDetails(asset);
   },true);
 
-  const v206EarlierScheduleEnhancements=scheduleEnhancements;
-  scheduleEnhancements=function(){
-    v206EarlierScheduleEnhancements();
-    requestAnimationFrame(()=>{
-      const host=document.getElementById('v205-db-dist-results');
-      const toolbar=document.getElementById('v205-db-dist-search')?.closest('.toolbar');
-      const needsDistributionBrowser=state?.screen==='database'&&state?.databaseFront==='distribution'&&
-        (!host?.querySelector('.v206-db-groups,.v206-db-list')||!toolbar?.querySelector('.v206-group-controls'));
-      if(needsDistributionBrowser)v206RenderDistributionBrowser();
-      v206EnsureStandardBackButtons();
-    });
-  };
+  function v206StandardizeDatabaseActions(){
+    if(state?.screen!=='database')return;
+    const front=state.databaseFront||'substation';
+    const exportButton=front==='distribution'?document.getElementById('v205-export-db'):front==='telecom'?document.getElementById('v205-export-tel'):document.getElementById('database-export-data');
+    const bulkButton=front==='distribution'?document.getElementById('v205-bulk-db'):front==='telecom'?document.getElementById('v205-bulk-tel'):document.getElementById('bulk-asset-update');
+    if(exportButton){exportButton.className='btn bulk-highlight database-export-btn';exportButton.innerHTML='📊 Exportar dados';exportButton.onclick=()=>typeof openDataExportDialog==='function'&&openDataExportDialog()}
+    if(bulkButton){bulkButton.className='btn bulk-highlight database-bulk-btn';bulkButton.innerHTML='📊 Atualização em massa';bulkButton.onclick=()=>typeof openBulkAssetUpdate==='function'&&openBulkAssetUpdate()}
+  }
+  function v206FinalizeDatabase(){
+    v206RenderDistributionBrowser();
+    v206StandardizeDatabaseActions();
+    v206EnsureStandardBackButtons();
+    if(typeof hydrateIcons==='function')hydrateIcons(main);
+  }
 
   /*
-   * v3.0.2: removido o segundo MutationObserver que reconstruía Distribuição
-   * depois de cada clique/expansão. O observer histórico acima continua cuidando
-   * da entrada em novas telas, sem competir com os controles da galeria.
+   * v3.0.3: a inicialização de Distribuição ocorre no fim do render de Banco de Dados,
+   * e não por observação contínua das mutações internas. Assim o navegador assume a tela
+   * uma vez, os filtros passam a ser donos do próprio redraw e "Todos" usa a lista completa.
    */
-  requestAnimationFrame(()=>{v206RenderDistributionBrowser();v206EnsureStandardBackButtons();});
+  if(typeof renderDatabase==='function'){
+    const v206BaseRenderDatabase=renderDatabase;
+    renderDatabase=async function(...args){
+      const result=await v206BaseRenderDatabase(...args);
+      requestAnimationFrame(v206FinalizeDatabase);
+      return result;
+    };
+  }
+  document.addEventListener('click',event=>{
+    if(!event.target.closest('[data-db-family],[data-db-tel],[data-db-front]'))return;
+    setTimeout(()=>requestAnimationFrame(v206FinalizeDatabase),0);
+  });
+  requestAnimationFrame(v206FinalizeDatabase);
 
 })();

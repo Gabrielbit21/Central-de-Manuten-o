@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.2'}};
-const APP_VERSION='3.0.2';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.3'}};
+const APP_VERSION='3.0.3';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -469,7 +469,96 @@ function applyCloudAssetToLocal(asset,row){asset.grupo=row.category;asset.tipo=r
 function normalizeSpreadsheetHeader(value){return normalize(String(value||'')).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}
 function spreadsheetModuleReady(){if(window.XLSX)return true;toast('O módulo de planilhas ainda não foi carregado. Verifique a internet e reabra o sistema.','warning');return false}
 function bulkTemplateRows(){return catalogAssets().sort((a,b)=>`${a.subSigla} ${assetTitle(a)}`.localeCompare(`${b.subSigla} ${assetTitle(b)}`,'pt-BR')).map(a=>({asset_id:String(a.id),subestacao_id:String(a.subId),subestacao:`${a.subSigla} — ${a.subNome}`,categoria:a.grupo||'',nome_tipo:assetName(a)||'',localizacao:a.localizacao||'',circuito:assetCircuit(a)||'',fabricante:a.fabricante||'',modelo:a.modelo||'',numero_serie:a.serial||'',numero_operativo:a.numeroOperativo||'',identificacao:a.identificacao||'',observacoes:a.observacoes||'',versao_registro:Number(a.rowVersion||1)}))}
+
+/* ===== v3.0.3 — atualização em massa multi-frente no mesmo componente ===== */
+const FRONT_BULK_SCHEMAS={
+  distribution_recloser:[['Código','operating_code'],['Status','status'],['Região','region'],['Subestação','substation_code'],['Alimentador','feeder'],['Localização','location_name'],['Fabricante','manufacturer'],['Modelo','model'],['Número de série','serial_number'],['Firmware do relé','data.relay_firmware'],['Meio de comunicação','data.communication_medium'],['Fabricante comunicação','data.communication_manufacturer'],['Tecnologia','data.communication_technology'],['Firmware comunicação','data.communication_firmware'],['Repetidora','data.repeater_name'],['IP rádio','data.radio_ip'],['IP relé','data.relay_ip'],['Operadora chip 1','data.sim1_operator'],['ICCID chip 1','data.sim1_iccid'],['Operadora chip 2','data.sim2_operator'],['ICCID chip 2','data.sim2_iccid']],
+  voltage_regulator:[['Código','operating_code'],['Status','status'],['Regional','region'],['Subestação','substation_code'],['Alimentador','feeder'],['Localização','location_name'],['Fabricante','manufacturer'],['Modelo','model'],['Número de série','serial_number'],['Nº série controle','data.control_serial'],['Firmware','data.firmware'],['Automatizado','data.automated'],['Comunicação','data.communication_type'],['Potência','data.power'],['Tensão de referência','data.reference_voltage'],['Relação TP','data.tp_ratio']],
+  repeater:[['Nome','display_name'],['Status','status'],['Cidade','data.city'],['CPS','data.cps'],['Tipo estrutura','data.structure_type'],['Fabricante estrutura','data.structure_manufacturer'],['Altura (m)','data.structure_height_m'],['AEV torre','data.aev_tower'],['AEV instalado','data.aev_installed'],['Ano instalação','data.installation_year'],['Bancos 48 V','data.battery_48v_banks'],['Tipo bateria','data.battery_type'],['Fabricante bateria','data.battery_manufacturer'],['IP XPS','data.xps_ip'],['Modelo XPS','data.xps_model'],['Acesso seco','data.road_dry'],['Acesso chuva','data.road_rain']],
+  telecom:[['Nome','display_name'],['Família','family_code'],['Subestação','substation_code'],['Fabricante','manufacturer'],['Modelo','model'],['Número de série','serial_number'],['Status','status']]
+};
+function databaseBulkMode(){
+  if((state.databaseFront||'substation')==='distribution')return state.databaseV205Family||'distribution_recloser';
+  if(state.databaseFront==='telecom')return (state.databaseTelecomType||'repeater')==='repeater'?'repeater':'telecom';
+  return null;
+}
+function frontBulkAssets(mode){
+  const rows=(state.frontAssets||[]).filter(asset=>asset.active!==false);
+  if(mode==='distribution_recloser'||mode==='voltage_regulator'||mode==='repeater')return rows.filter(asset=>asset.family_code===mode);
+  if(mode==='telecom')return rows.filter(asset=>asset.business_front==='telecom'&&asset.family_code!=='repeater');
+  return [];
+}
+function frontBulkGet(asset,path){
+  if(!asset||!path)return null;
+  if(path.startsWith('data.')){let value=asset.data||{};for(const part of path.slice(5).split('.')){if(value==null)return null;value=value[part]}return value}
+  return asset[path];
+}
+function frontBulkModeLabel(mode){return ({distribution_recloser:'Religadores',voltage_regulator:'Reguladores de Tensão',repeater:'Repetidoras',telecom:'Telecom'})[mode]||'Ativos'}
+function frontBulkBatchCacheKey(){return `front-bulk-batches:${state.cloudUser?.id||'local'}`}
+async function loadFrontBulkRecentBatches(){
+  const key=frontBulkBatchCacheKey();if(state.frontBulkBatchesLoadedFor===key&&Array.isArray(state.frontBulkRecentBatches))return state.frontBulkRecentBatches;
+  const cached=await idbGet('cloudCache',key).catch(()=>null);state.frontBulkRecentBatches=Array.isArray(cached?.data)?cached.data:[];state.frontBulkBatchesLoadedFor=key;return state.frontBulkRecentBatches;
+}
+async function saveFrontBulkRecentBatches(){
+  const key=frontBulkBatchCacheKey(),data=(state.frontBulkRecentBatches||[]).slice(0,12);state.frontBulkRecentBatches=data;await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null}).catch(error=>console.warn('Cache de lotes front_assets:',error?.message||error));
+}
+function frontBulkTemplateRows(mode){
+  const schema=FRONT_BULK_SCHEMAS[mode]||[],assets=frontBulkAssets(mode);
+  return assets.sort((a,b)=>String(a.operating_code||a.display_name||'').localeCompare(String(b.operating_code||b.display_name||''),'pt-BR',{numeric:true})).map(asset=>{
+    const row={asset_id:String(asset.id),versao_registro:Number(asset.row_version||1)};
+    for(const [label,path] of schema)row[label]=frontBulkGet(asset,path)??'';
+    return row;
+  });
+}
+function exportFrontAssetUpdateWorkbook(mode){
+  if(!spreadsheetModuleReady())return;
+  const wb=XLSX.utils.book_new(),schema=FRONT_BULK_SCHEMAS[mode]||[];
+  const instructions=[['MODELO DE ATUALIZAÇÃO DE ATIVOS'],[''],['Frente / família',frontBulkModeLabel(mode)],[''],['Regras'],['1. Não altere asset_id ou versao_registro.'],['2. Células vazias mantêm o valor atual.'],['3. Para apagar um valor, escreva [LIMPAR].'],['4. A importação mostra as diferenças antes de alterar a base.'],['5. Alterações usam controle de versão do cadastro para evitar sobrescritas concorrentes.']];
+  const wsInfo=XLSX.utils.aoa_to_sheet(instructions),rows=frontBulkTemplateRows(mode),headers=['asset_id','versao_registro',...schema.map(([label])=>label)],ws=XLSX.utils.json_to_sheet(rows,{header:headers});
+  ws['!cols']=headers.map((header,index)=>({wch:index===0?38:index===1?16:Math.max(18,Math.min(34,String(header).length+5))}));ws['!autofilter']={ref:ws['!ref']};wsInfo['!cols']=[{wch:95},{wch:36}];
+  XLSX.utils.book_append_sheet(wb,wsInfo,'Instruções');XLSX.utils.book_append_sheet(wb,ws,'Ativos');XLSX.writeFile(wb,`Atualizacao_${frontBulkModeLabel(mode).replace(/[^a-z0-9]+/gi,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`,{compression:true});
+}
+function validateFrontBulkValue(path,value){
+  const text=String(value??'').trim();if(!text)return null;
+  if(path.includes('iccid')&&!/^#?\d{20}$/.test(text))return 'ICCID inválido';
+  if(path.endsWith('_ip')){const parts=text.split('.');if(parts.length!==4||parts.some(part=>!/^\d{1,3}$/.test(part)||Number(part)>255))return 'IPv4 inválido'}
+  if(path.includes('operator')&&!['ALGAR','CLARO','VIVO','TIM','OI','NAO HA OPERADORA REDUNDANTE','NÃO HÁ OPERADORA REDUNDANTE','-'].includes(normalize(text).toUpperCase()))return 'Operadora inválida';
+  return null;
+}
+function compareImportedFrontAssetRows(rows,fileName,mode){
+  const assets=new Map(frontBulkAssets(mode).map(asset=>[String(asset.id),asset])),schema=FRONT_BULK_SCHEMAS[mode]||[],seen=new Set(),items=[],errors=[];let unchanged=0;
+  rows.forEach((raw,index)=>{
+    const row={};for(const [key,value] of Object.entries(raw||{}))row[normalizeSpreadsheetHeader(key)]=value;
+    const line=index+2,id=String(row.asset_id??'').trim();if(!id){errors.push(`Linha ${line}: asset_id não informado.`);return}if(seen.has(id)){errors.push(`Linha ${line}: asset_id duplicado (${id}).`);return}seen.add(id);
+    const asset=assets.get(id);if(!asset){errors.push(`Linha ${line}: asset_id ${id} não pertence à frente/família selecionada.`);return}
+    const importedVersion=Number(row.versao_registro||0);if(importedVersion&&importedVersion!==Number(asset.row_version||1)){errors.push(`Linha ${line}: versão desatualizada para ${asset.operating_code||asset.display_name||id}.`);return}
+    const updates={},beforeUpdates={},changes=[];
+    for(const [label,path] of schema){const header=normalizeSpreadsheetHeader(label);if(!(header in row))continue;const rawValue=row[header];if(rawValue===null||rawValue===undefined||String(rawValue).trim()==='')continue;const value=String(rawValue).trim()==='[LIMPAR]'?null:String(rawValue).trim(),beforeRaw=frontBulkGet(asset,path),before=String(beforeRaw??'').trim(),after=value===null?'':String(value);if(before===after)continue;const invalid=validateFrontBulkValue(path,value);if(invalid){errors.push(`Linha ${line} · ${label}: ${invalid}.`);continue}updates[path]=value;beforeUpdates[path]=beforeRaw??null;changes.push({field:path,label,before:before||'—',after:after||'—'})}
+    if(Object.keys(updates).length)items.push({asset_id:id,expected_version:Number(asset.row_version||1),updates,before_updates:beforeUpdates,changes,title:asset.operating_code||asset.display_name||id});else unchanged++;
+  });
+  return {kind:'front-assets',mode,fileName,total:rows.length,items,errors,unchanged};
+}
+async function refreshFrontAssetsAfterBulk(){
+  if(!navigator.onLine||!cloudClient)return;
+  try{const rows=await paginatedSelect('front_assets','*','display_name');if(Array.isArray(rows)){state.frontAssets=rows.map(asset=>({...asset,row_version:Number(asset.row_version||1),data:asset.data||{},data_state:asset.data_state||{}}));state.frontAssetMap=new Map(state.frontAssets.map(asset=>[asset.id,asset]))}}catch(error){console.warn('Atualização front_assets após importação:',error?.message||error)}
+}
+async function applyPendingFrontAssetImport(result){
+  if(!result?.items?.length||result.errors?.length)return;if(!navigator.onLine)return toast('A importação exige conexão com a nuvem.','warning');
+  const button=document.getElementById('confirm-bulk-import');if(button){button.disabled=true;button.textContent='Aplicando…'}
+  const batchId=crypto.randomUUID(),applied=[];
+  try{
+    for(const item of result.items){const {error}=await cloudClient.rpc('update_front_asset_record',{p_asset_id:item.asset_id,p_expected_version:item.expected_version,p_updates:item.updates});if(error)throw error;applied.push(item)}
+    await refreshFrontAssetsAfterBulk();state.pendingAssetImport=null;await loadFrontBulkRecentBatches();state.frontBulkRecentBatches.unshift({id:batchId,mode:result.mode,file_name:result.fileName,changed_assets:applied.length,status:'applied',created_at:new Date().toISOString(),items:applied.map(item=>({asset_id:item.asset_id,before_updates:item.before_updates,after_updates:item.updates}))});await saveFrontBulkRecentBatches();toast(`${applied.length} ativo(s) atualizado(s).`);openBulkAssetUpdate();
+  }catch(error){if(button){button.disabled=false;button.textContent='Aplicar atualizações'}toast(error.message||String(error),'warning')}
+}
+async function revertFrontAssetBulkBatch(batchId){
+  const batches=await loadFrontBulkRecentBatches(),batch=batches.find(item=>item.id===batchId);if(!batch||batch.status!=='applied')return;if(!navigator.onLine)return toast('A reversão exige conexão com a nuvem.','warning');if(!confirm('Reverter todas as alterações deste lote?'))return;
+  try{let reverted=0;for(const item of [...batch.items].reverse()){const asset=state.frontAssetMap?.get?.(item.asset_id)||(state.frontAssets||[]).find(row=>row.id===item.asset_id);if(!asset)continue;for(const [path,appliedValue] of Object.entries(item.after_updates||{})){const current=frontBulkGet(asset,path);if(String(current??'')!==String(appliedValue??''))throw new Error(`O ativo ${asset.operating_code||asset.display_name||asset.id} foi alterado depois deste lote. A reversão foi interrompida para proteger o cadastro.`)}const {error}=await cloudClient.rpc('update_front_asset_record',{p_asset_id:item.asset_id,p_expected_version:Number(asset.row_version||1),p_updates:item.before_updates});if(error)throw error;reverted++;await refreshFrontAssetsAfterBulk()}batch.status='reverted';batch.reverted_at=new Date().toISOString();await saveFrontBulkRecentBatches();toast(`${reverted} ativo(s) revertido(s).`);openBulkAssetUpdate()}catch(error){toast(error.message||String(error),'warning')}
+}
+/* ===== fim v3.0.3 atualização em massa multi-frente ===== */
+
 function exportAssetUpdateWorkbook(){
+  const frontMode=state.activeBulkMode||databaseBulkMode();if(frontMode&&frontMode!=='substation')return exportFrontAssetUpdateWorkbook(frontMode);
   if(!spreadsheetModuleReady())return;const wb=XLSX.utils.book_new();
   const instructions=[['MODELO DE ATUALIZAÇÃO DE ATIVOS'],[''],['Regras'],['1. Não altere asset_id, subestacao_id ou versao_registro.'],['2. Células vazias mantêm o valor atual.'],['3. Para apagar um valor, escreva [LIMPAR].'],['4. Novos ativos entram pelo módulo Integração; trocas entram por Substituição.'],['5. A importação mostra as diferenças antes de alterar a base e pode ser revertida em lote.']];
   const wsInfo=XLSX.utils.aoa_to_sheet(instructions),rows=bulkTemplateRows(),ws=XLSX.utils.json_to_sheet(rows,{header:['asset_id','subestacao_id','subestacao','categoria','nome_tipo','localizacao','circuito','fabricante','modelo','numero_serie','numero_operativo','identificacao','observacoes','versao_registro']});
@@ -484,13 +573,17 @@ function compareImportedAssetRows(rows,fileName){
   });return {fileName,total:rows.length,items,errors,unchanged}
 }
 function renderImportPreview(result){const host=document.getElementById('bulk-import-preview');if(!host)return;state.pendingAssetImport=result;host.innerHTML=`<div class="import-summary"><div class="import-kpi"><strong>${result.total}</strong><span>linhas lidas</span></div><div class="import-kpi"><strong>${result.items.length}</strong><span>ativos com alterações</span></div><div class="import-kpi"><strong>${result.unchanged}</strong><span>sem alterações</span></div><div class="import-kpi error"><strong>${result.errors.length}</strong><span>erros</span></div></div>${result.errors.length?`<div class="import-error-list"><b>Corrija o arquivo antes de importar:</b><br>${result.errors.slice(0,25).map(esc).join('<br>')}${result.errors.length>25?`<br>... e mais ${result.errors.length-25} erro(s).`:''}</div>`:''}${result.items.length?`<div class="import-preview">${result.items.slice(0,80).map(item=>`<article class="import-asset-change"><strong>${esc(item.title)}</strong>${item.changes.map(c=>`<div class="import-change-row"><b>${esc(c.label)}</b><span>${esc(c.before)}</span><span>→</span><span>${esc(c.after)}</span></div>`).join('')}</article>`).join('')}</div>`:'<div class="empty">Nenhuma alteração foi encontrada.</div>'}<div class="report-actions"><button class="btn secondary" id="clear-import-preview">Limpar análise</button><button class="btn primary" id="confirm-bulk-import" ${result.errors.length||!result.items.length?'disabled':''}>Aplicar ${result.items.length} atualização(ões)</button></div>`;document.getElementById('clear-import-preview').onclick=()=>{state.pendingAssetImport=null;host.innerHTML=''};document.getElementById('confirm-bulk-import')?.addEventListener('click',applyPendingAssetImport)}
-async function parseAssetUpdateWorkbook(file){if(!spreadsheetModuleReady())return;try{const buffer=await file.arrayBuffer(),wb=XLSX.read(buffer,{type:'array'}),sheet=wb.Sheets['Ativos']||wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});renderImportPreview(compareImportedAssetRows(rows,file.name))}catch(error){toast('Não foi possível ler a planilha: '+(error.message||error),'warning')}}
-async function applyPendingAssetImport(){const result=state.pendingAssetImport;if(!result?.items.length||result.errors.length)return;if(!navigator.onLine)return toast('A importação exige conexão com a nuvem.','warning');const button=document.getElementById('confirm-bulk-import');button.disabled=true;button.textContent='Aplicando…';try{const batchId=crypto.randomUUID(),rows=result.items.map(i=>({asset_id:i.asset_id,expected_version:i.expected_version,updates:i.updates}));const {data,error}=await cloudClient.rpc('apply_asset_bulk_update',{p_batch_id:batchId,p_file_name:result.fileName,p_rows:rows});if(error)throw error;state.pendingAssetImport=null;await loadCloudSnapshot();toast(`${data?.changed_assets||rows.length} ativo(s) atualizado(s).`);openBulkAssetUpdate()}catch(error){button.disabled=false;button.textContent='Aplicar atualizações';toast(error.message||String(error),'warning')}}
+async function parseAssetUpdateWorkbook(file){if(!spreadsheetModuleReady())return;try{const buffer=await file.arrayBuffer(),wb=XLSX.read(buffer,{type:'array'}),sheet=wb.Sheets['Ativos']||wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false}),frontMode=state.activeBulkMode||databaseBulkMode();renderImportPreview(frontMode&&frontMode!=='substation'?compareImportedFrontAssetRows(rows,file.name,frontMode):compareImportedAssetRows(rows,file.name))}catch(error){toast('Não foi possível ler a planilha: '+(error.message||error),'warning')}}
+async function applyPendingAssetImport(){const result=state.pendingAssetImport;if(result?.kind==='front-assets')return applyPendingFrontAssetImport(result);if(!result?.items.length||result.errors.length)return;if(!navigator.onLine)return toast('A importação exige conexão com a nuvem.','warning');const button=document.getElementById('confirm-bulk-import');button.disabled=true;button.textContent='Aplicando…';try{const batchId=crypto.randomUUID(),rows=result.items.map(i=>({asset_id:i.asset_id,expected_version:i.expected_version,updates:i.updates}));const {data,error}=await cloudClient.rpc('apply_asset_bulk_update',{p_batch_id:batchId,p_file_name:result.fileName,p_rows:rows});if(error)throw error;state.pendingAssetImport=null;await loadCloudSnapshot();toast(`${data?.changed_assets||rows.length} ativo(s) atualizado(s).`);openBulkAssetUpdate()}catch(error){button.disabled=false;button.textContent='Aplicar atualizações';toast(error.message||String(error),'warning')}}
 async function recentAssetImportBatches(){if(!navigator.onLine||state.role!=='admin')return[];const {data,error}=await cloudClient.from('asset_import_batches').select('*').order('created_at',{ascending:false}).limit(12);return error?[]:(data||[])}
 async function revertAssetImportBatch(batchId){if(!confirm('Reverter todas as alterações deste lote?'))return;const {data,error}=await cloudClient.rpc('revert_asset_import_batch',{p_batch_id:batchId});if(error)return toast(error.message||String(error),'warning');await loadCloudSnapshot();toast(`${data?.reverted_assets||0} ativo(s) revertido(s).`);openBulkAssetUpdate()}
 async function openBulkAssetUpdate(){
-  if(state.role!=='admin')return;const batches=await recentAssetImportBatches();document.getElementById('modal-root').innerHTML=`<div class="modal no-backdrop-close" id="bulk-update-modal"><div class="modal-card bulk-update-card"><button class="modal-close" id="close-bulk-update" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Atualização em massa de ativos</h2><p class="muted">Exporte a base atual, altere somente os campos necessários e envie a planilha para revisar as diferenças.</p><div class="bulk-update-actions"><section class="bulk-action"><h3>1. Exportar modelo atualizado</h3><p>Baixa os ativos atuais com identificadores protegidos e campos próprios para correção.</p><button class="btn secondary" id="export-assets-xlsx">Baixar Excel</button></section><section class="bulk-action"><h3>2. Analisar planilha preenchida</h3><p>Nenhum dado é alterado antes da tela de conferência.</p><label class="btn primary" for="bulk-file-input">Selecionar Excel</label><input class="bulk-file-input" id="bulk-file-input" type="file" accept=".xlsx,.xls"></section></div><div id="bulk-import-preview"></div><div class="detail-block"><h3>Lotes recentes</h3><div class="import-batches">${batches.length?batches.map(b=>`<article class="import-batch"><div><strong>${esc(b.file_name||'Importação')}</strong><small>${formatDate(b.created_at)} · ${b.changed_assets||0} ativo(s) · ${b.status==='reverted'?'Revertido':'Aplicado'}</small></div>${b.status==='applied'?`<button class="btn secondary" data-revert-batch="${b.id}">Reverter lote</button>`:''}</article>`).join(''):'<div class="empty">Nenhuma importação registrada.</div>'}</div></div></div></div>`;
-  const close=()=>document.getElementById('modal-root').innerHTML='';document.getElementById('close-bulk-update').onclick=close;document.getElementById('bulk-update-modal').onclick=e=>{if(e.target===e.currentTarget)e.stopPropagation()};document.getElementById('export-assets-xlsx').onclick=exportAssetUpdateWorkbook;document.getElementById('bulk-file-input').onchange=e=>e.target.files[0]&&parseAssetUpdateWorkbook(e.target.files[0]);document.querySelectorAll('[data-revert-batch]').forEach(b=>b.onclick=()=>revertAssetImportBatch(b.dataset.revertBatch));
+  if(state.role!=='admin')return;
+  const frontMode=databaseBulkMode();state.activeBulkMode=frontMode||'substation';
+  const frontBatches=frontMode?(await loadFrontBulkRecentBatches()).filter(batch=>batch.mode===frontMode):null;
+  const batches=frontMode?frontBatches:await recentAssetImportBatches();
+  document.getElementById('modal-root').innerHTML=`<div class="modal no-backdrop-close" id="bulk-update-modal"><div class="modal-card bulk-update-card"><button class="modal-close" id="close-bulk-update" type="button" aria-label="Fechar"><span data-icon="x"></span></button><h2>Atualização em massa de ativos</h2><p class="muted">Exporte a base atual, altere somente os campos necessários e envie a planilha para revisar as diferenças.</p><div class="bulk-update-actions"><section class="bulk-action"><h3>1. Exportar modelo atualizado</h3><p>Baixa os ativos atuais com identificadores protegidos e campos próprios para correção.</p><button class="btn secondary" id="export-assets-xlsx">Baixar Excel</button></section><section class="bulk-action"><h3>2. Analisar planilha preenchida</h3><p>Nenhum dado é alterado antes da tela de conferência.</p><label class="btn primary" for="bulk-file-input">Selecionar Excel</label><input class="bulk-file-input" id="bulk-file-input" type="file" accept=".xlsx,.xls"></section></div><div id="bulk-import-preview"></div><div class="detail-block"><h3>Lotes recentes</h3><div class="import-batches">${batches.length?batches.map(b=>`<article class="import-batch"><div><strong>${esc(b.file_name||'Importação')}</strong><small>${formatDate(b.created_at)} · ${b.changed_assets||0} ativo(s) · ${b.status==='reverted'?'Revertido':'Aplicado'}</small></div>${b.status==='applied'?`<button class="btn secondary" data-revert-batch="${b.id}">Reverter lote</button>`:''}</article>`).join(''):`<div class="empty">${frontMode?'Nenhuma importação registrada para esta frente.':'Nenhuma importação registrada.'}</div>`}</div></div></div></div>`;
+  const close=()=>{document.getElementById('modal-root').innerHTML='';state.pendingAssetImport=null;state.activeBulkMode=null};document.getElementById('close-bulk-update').onclick=close;document.getElementById('bulk-update-modal').onclick=e=>{if(e.target===e.currentTarget)e.stopPropagation()};document.getElementById('export-assets-xlsx').onclick=exportAssetUpdateWorkbook;document.getElementById('bulk-file-input').onchange=e=>e.target.files[0]&&parseAssetUpdateWorkbook(e.target.files[0]);document.querySelectorAll('[data-revert-batch]').forEach(b=>b.onclick=()=>frontMode?revertFrontAssetBulkBatch(b.dataset.revertBatch):revertAssetImportBatch(b.dataset.revertBatch));
 }
 
 async function renderDatabase(){
@@ -701,7 +794,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.2.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.3.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -734,7 +827,7 @@ function authMessage(text,type='info'){
 }
 function setAuthBusy(form,busy,label){const button=form?.querySelector('button[type="submit"]');if(!button)return;if(!button.dataset.label)button.dataset.label=button.textContent;button.disabled=busy;button.textContent=busy?label:button.dataset.label}
 function isValidAccountEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email||'').trim().toLowerCase())}
-function showAuthTab(name){if(name==='verify'&&!pendingVerificationEmail)name='signup';const activeTab=(name==='verify'||name==='invite')?'signup':name;document.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active',b.dataset.authTab===activeTab));document.querySelectorAll('[data-auth-pane]').forEach(p=>p.classList.toggle('active',p.dataset.authPane===name));if(name==='verify'){document.getElementById('verify-email-target').textContent=pendingVerificationEmail||'Informe o e-mail na etapa anterior'}authMessage('')}
+function showAuthTab(name){if(name==='verify'&&!pendingVerificationEmail)name='signup';const activeTab=(name==='verify'||name==='invite')?'signup':name;document.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active',b.dataset.authTab===activeTab));document.querySelectorAll('[data-auth-pane]').forEach(p=>p.classList.toggle('active',p.dataset.authPane===name));const authFooter=document.querySelector('#auth-shell .auth-build-footer');if(authFooter)authFooter.classList.toggle('hidden',name!=='login');if(name==='verify'){document.getElementById('verify-email-target').textContent=pendingVerificationEmail||'Informe o e-mail na etapa anterior'}authMessage('')}
 function showCloudLoading(show,text='Sincronizando a base…'){const el=document.getElementById('cloud-loading');if(!el)return;el.classList.toggle('hidden',!show);const strong=el.querySelector('strong');if(strong)strong.textContent=text}
 function cachedIdentity(){try{return JSON.parse(localStorage.getItem('central_offline_identity')||'null')}catch{return null}}
 function storeIdentity(user,profile){const safeProfile={id:profile?.id||user.id,display_name:profile?.display_name||user.email||'Usuário',role:profile?.role==='admin'?'admin':'field',active:profile?.active!==false,avatar_path:profile?.avatar_path||null,approval_status:'approved',must_change_password:false};localStorage.setItem('central_offline_identity',JSON.stringify({user:{id:user.id,email:user.email},profile:safeProfile,authenticatedAt:new Date().toISOString()}))}
@@ -1769,8 +1862,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='3.0.2';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.3';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='3.0.3';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1851,7 +1944,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.3';
 };
 
 
@@ -1882,7 +1975,7 @@ function standardMaintenanceExportRow(report){
   const date=form.data||raw.data||report.date||report.createdAt,created=report.createdAt||raw.criadoEm||raw.created_at||date;
   return {ID_RELATORIO:exportSafeText(report.id),NUMERO_RELATORIO:exportSafeText(report.number||raw.numeroRelatorio||raw.report_number),DATA_ATENDIMENTO:exportIsoDate(date),DATA_CRIACAO:exportDateTime(created),FAMILIA_ATIVO:families.map(exportFamilyLabel).join(' / '),LOCAL:exportSafeText(sub.nome||report.substation),SIGLA_LOCAL:exportSafeText(sub.sigla||report.subId),REGIAO:exportSafeText(sub.regiao),EQUIPE_RESPONSAVEL:exportSafeText(canonicalTeamName(report.author||form.equipe||raw.equipe)),TIPO_MANUTENCAO:exportSafeText(report.type||form.tipo||raw.tipoManutencao),ORDEM_SERVICO:exportSafeText(form.os||raw.os||payload.ordemServico),INICIO:exportSafeText(form.inicio||raw.inicio),FIM:exportSafeText(form.fim||raw.fim),ATIVOS:(report.assets||[]).join(' | '),IDS_ATIVOS:assetIds.join(' | '),STATUS_RELATORIO:exportStatusLabel(report.status),RESULTADO:report.outcome==='inconclusivo'?'Inconclusivo':'Concluído',REVISAO:Number(raw.revisao||raw.revision||1),DEFEITO:exportSafeText(form.defeito||raw.defeito),CAUSA:exportSafeText(form.causa||raw.causa),REPARO_REALIZADO:exportSafeText(form.reparo||raw.reparo),CONFIGURACAO:exportSafeText(form.configuracao||raw.configuracao),PECA_SUBSTITUIDA:exportSafeText(form.peca||raw.pecaSubstituida),DESTINO_PECA:exportSafeText(form.destinoPeca||raw.destinoPeca),COMENTARIOS:exportSafeText(form.comentarios||raw.comentarios),NECESSARIO_RETORNO:exportSafeText(form.retorno||raw.necessitaRetorno),MOTIVO_DEVOLUCAO:exportSafeText(raw.motivoReprovacao||raw.rejection_reason),FONTE:report.source==='imported'?'Histórico importado':report.source==='local'?'Registro local':'Central de Manutenção'}
 }
-/* ===== v3.0.2 — exportação multi-frente no MESMO componente ===== */
+/* ===== v3.0.3 — exportação multi-frente no MESMO componente ===== */
 function v301ExportReportFront(report){
   return report?.businessFront
     || report?.raw?.businessFront
@@ -2043,7 +2136,7 @@ async function v301ExportDatasets(){
   [...live,...imported].forEach(row=>byId.set(`${row.FONTE}|${row.ID_RELATORIO}`,row));
   return {front,assets,reports:[...byId.values()]};
 }
-/* ===== fim v3.0.2 exportação multi-frente ===== */
+/* ===== fim v3.0.3 exportação multi-frente ===== */
 function exportPeriodBounds(preset,fromValue,toValue){const now=new Date(),start=new Date(now),end=new Date(now);start.setHours(0,0,0,0);end.setHours(23,59,59,999);if(preset==='week'){const day=(now.getDay()+6)%7;start.setDate(now.getDate()-day)}else if(preset==='month'){start.setDate(1)}else if(preset==='previous_month'){start.setMonth(now.getMonth()-1,1);end.setDate(0)}else if(preset==='last30'){start.setDate(now.getDate()-29)}else if(preset==='custom'){const f=fromValue?new Date(fromValue+'T00:00:00'):null,t=toValue?new Date(toValue+'T23:59:59'):null;return {start:f&&!Number.isNaN(f)?f:null,end:t&&!Number.isNaN(t)?t:null,label:[fromValue||'início',toValue||'hoje'].join(' a ')}}else return {start:null,end:null,label:'Todo o período'};return {start,end,label:`${start.toLocaleDateString('pt-BR')} a ${end.toLocaleDateString('pt-BR')}`}}
 function exportReportDateMs(row){const value=row.DATA_ATENDIMENTO||row.DATA_CRIACAO;if(!value)return 0;const br=String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})/);const d=br?new Date(`${br[3]}-${br[2]}-${br[1]}T12:00:00`):new Date(value+'T12:00:00');return Number.isNaN(d.getTime())?0:d.getTime()}
 function exportApplyMaintenanceFilters(rows,filters){const bounds=exportPeriodBounds(filters.period,filters.from,filters.to),start=bounds.start?.getTime()??-Infinity,end=bounds.end?.getTime()??Infinity;return rows.filter(row=>{const time=exportReportDateMs(row);return time>=start&&time<=end&&(!filters.team||row.EQUIPE_RESPONSAVEL===filters.team)&&(!filters.substation||row.SIGLA_LOCAL===filters.substation)&&(!filters.status||row.STATUS_RELATORIO===filters.status)&&(!filters.family||row.FAMILIA_ATIVO.includes(exportFamilyLabel(filters.family)))})}
@@ -2101,7 +2194,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.3';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.3'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2193,8 +2286,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.3';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.3';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3208,7 +3301,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.2 — fundação multi-frente e equipe executante padronizada ===== */
+/* ===== v3.0.3 — fundação multi-frente e equipe executante padronizada ===== */
 state.businessFront = state.businessFront || null;
 state.businessFronts = state.businessFronts || [
   {code:'substation',label:'Subestações',active:true,sort_order:10},
@@ -3344,7 +3437,7 @@ async function loadV200Auxiliary(){
     await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null});
     applyV200Auxiliary(data);
   }catch(error){
-    console.warn('v3.0.2 diretório de colaboradores:',error?.message||error);
+    console.warn('v3.0.3 diretório de colaboradores:',error?.message||error);
     const cached=await idbGet('cloudCache',key);
     if(cached?.data)return applyV200Auxiliary(cached.data);
     /* Fallback seguro durante homologação: usa o diretório de perfis
@@ -3496,7 +3589,7 @@ ensureReportChildren=async function(record,user){
     const {error:insertError}=await cloudClient.from('maintenance_report_participants').insert(rows);
     if(insertError&&insertError.code!=='23505')throw insertError;
   }catch(error){
-    console.warn('v3.0.2 participantes:',error?.message||error);
+    console.warn('v3.0.3 participantes:',error?.message||error);
     if(error?.code!=='42P01')throw error;
   }
 };
@@ -3534,7 +3627,7 @@ injectMyReportsOnHome=async function(){
   });
 };
 
-/* Estado visual da Home v3.0.2 */
+/* Estado visual da Home v3.0.3 */
 const _v200SetActiveNav=setActiveNav;
 setActiveNav=function(target){
   const result=_v200SetActiveNav(target);
@@ -3543,7 +3636,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.2 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
+/* ===== v3.0.3 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
 
 function v201AssetHistoryCacheKey(assetId){
   const uid=state.cloudUser?.id||'anonymous';
@@ -3598,7 +3691,7 @@ async function v201FullAssetHistory(asset,subId=state.sub){
       await idbPut('cloudCache',{key,data:rows,updatedAt:new Date().toISOString(),userId:state.cloudUser.id});
       return rows;
     }catch(error){
-      console.warn('v3.0.2 histórico do ativo:',error?.message||error);
+      console.warn('v3.0.3 histórico do ativo:',error?.message||error);
     }
   }
   const cached=await idbGet('cloudCache',key).catch(()=>null);
