@@ -1,4 +1,4 @@
-const SW_VERSION = '2.0.8-media-v8.0';
+const SW_VERSION = '2.0.9-media-v9.0';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -12,11 +12,13 @@ const APP_SHELL = [
   './assets/js/v206.js',
   './assets/js/v207.js',
   './assets/js/v208.js',
+  './assets/js/v209.js',
   './assets/js/media-core.js',
   './assets/css/v205.css',
   './assets/css/v206.css',
   './assets/css/v207.css',
   './assets/css/v208.css',
+  './assets/css/v209.css',
   './assets/css/media-core.css',
   './assets/data/v205/front-assets.json',
   './assets/data/v205/front-history.json',
@@ -62,11 +64,13 @@ self.addEventListener('fetch', event => {
     '/assets/js/v206.js',
     '/assets/js/v207.js',
     '/assets/js/v208.js',
+    '/assets/js/v209.js',
     '/assets/js/media-core.js',
     '/assets/css/v205.css',
     '/assets/css/v206.css',
     '/assets/css/v207.css',
     '/assets/css/v208.css',
+    '/assets/css/v209.css',
     '/assets/css/media-core.css',
     '/assets/data/v205/front-assets.json',
     '/assets/data/v205/front-history.json',
