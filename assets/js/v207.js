@@ -38,6 +38,8 @@
   }
   function firstName(name){return safe(name).trim().split(/\s+/)[0]||''}
   function updateLoginGreeting(){
+    /* v3.0.2: a saudação persistente pertence à camada v300. */
+    if(globalThis.__CENTRAL_V300__)return;
     const shell=document.getElementById('auth-shell');if(!shell)return;
     const email=shell.querySelector('#login-form input[name="email"]')?.value||'';
     const c=cachedIdentityV207();const known=(!email||norm(email)===norm(c?.user?.email))?firstName(c?.profile?.display_name):'';
@@ -64,25 +66,79 @@
 
   /* ---------- Histórico Telecom ---------- */
   let telecomHistoryPromise=null;
+  let telecomHistorySeedPromise=null;
+  let telecomHistorySeededForSession=false;
   function mergeHistory(rows){
     const map=new Map((state.frontHistory||[]).map(x=>[x.id,x]));
     for(const r of rows||[])map.set(r.id,r);
     state.frontHistory=[...map.values()];
   }
-  async function loadTelecomHistory(){
-    if(telecomHistoryPromise)return telecomHistoryPromise;
-    telecomHistoryPromise=(async()=>{
+  function seedTelecomHistoryWhenReady(rows){
+    if(
+      telecomHistorySeededForSession||
+      telecomHistorySeedPromise||
+      !Array.isArray(rows)||
+      !rows.length||
+      !navigator.onLine||
+      state.role!=='admin'||
+      !state.cloudUser||
+      !cloudClient
+    )return;
+
+    telecomHistorySeedPromise=(async()=>{
       try{
-        const response=await fetch('./assets/data/v207/telecom-history.json',{cache:'no-store'});
-        if(!response.ok)throw new Error('Histórico Telecom v2.0.7 indisponível');
-        const rows=await response.json();mergeHistory(Array.isArray(rows)?rows:[]);
-        if(navigator.onLine&&state.role==='admin'&&state.cloudUser&&cloudClient){
-          setTimeout(async()=>{try{for(let i=0;i<rows.length;i+=80){const {error}=await cloudClient.rpc('seed_v205_front_history',{p_rows:rows.slice(i,i+80)});if(error)throw error}}catch(e){console.warn('[v2.0.7] seed histórico Telecom:',e)}},40);
+        for(let i=0;i<rows.length;i+=80){
+          const {error}=await cloudClient.rpc('seed_v205_front_history',{p_rows:rows.slice(i,i+80)});
+          if(error)throw error;
         }
-        return rows;
-      }catch(e){console.warn('[v2.0.7] histórico Telecom:',e);return[]}
+        telecomHistorySeededForSession=true;
+        return true;
+      }catch(e){
+        console.warn('[v2.0.7] seed histórico Telecom:',e);
+        return false;
+      }finally{
+        telecomHistorySeedPromise=null;
+      }
     })();
-    return telecomHistoryPromise;
+  }
+  async function loadTelecomHistory(){
+    if(!telecomHistoryPromise){
+      telecomHistoryPromise=(async()=>{
+        try{
+          const response=await fetch('./assets/data/v207/telecom-history.json',{cache:'no-store'});
+          if(!response.ok)throw new Error('Histórico Telecom v2.0.7 indisponível');
+          const rows=await response.json();
+          return Array.isArray(rows)?rows:[];
+        }catch(e){
+          console.warn('[v2.0.7] histórico Telecom:',e);
+          return[];
+        }
+      })();
+    }
+
+    const rows=await telecomHistoryPromise;
+
+    /*
+     * O histórico v2.0.5 pode ser recarregado da nuvem depois que este arquivo
+     * já leu o JSON local. Isso substitui state.frontHistory. Por isso a mesclagem
+     * precisa acontecer em toda chamada, e não somente na primeira leitura.
+     */
+    mergeHistory(rows);
+    seedTelecomHistoryWhenReady(rows);
+    return rows;
+  }
+
+  /*
+   * A carga principal da nuvem da camada v2.0.5 substitui state.frontHistory.
+   * Reaplicamos o histórico Telecom logo depois para preservar as três frentes.
+   */
+  if(typeof loadCloudSnapshot==='function'){
+    const v207BaseLoadCloudSnapshot=loadCloudSnapshot;
+    loadCloudSnapshot=async function(...args){
+      const result=await v207BaseLoadCloudSnapshot(...args);
+      await loadTelecomHistory();
+      return result;
+    };
   }
 
   /* ---------- Foto principal + pasta do ativo ---------- */

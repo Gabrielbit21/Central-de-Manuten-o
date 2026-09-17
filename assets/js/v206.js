@@ -363,7 +363,15 @@
 
   /* ===== v2.0.6 — consolidação visual e funcional final ===== */
   const v206NormCode = value => normalized(value).replace(/[^A-Z0-9]/g, '');
-  const v206StatusClass = value => normalized(value).includes('OPERACAO') ? 'ok' : '';
+  const v206StatusClass = value => {
+    const status=normalized(value);
+    if(status.includes('SUCATA'))return 'scrap';
+    if(status.includes('MANUTENCAO')||status.includes('FORA DE OPERACAO'))return 'warning';
+    if(status.includes('RESERVA'))return 'reserve';
+    if(status.includes('INATIVO')||status.includes('DESATIVADO'))return 'inactive';
+    if(status.includes('OPERACAO'))return 'ok';
+    return '';
+  };
 
   function v206FrontDetailRows(asset) {
     const rows = [
@@ -763,6 +771,19 @@
     const host=document.getElementById('v205-db-dist-results'), search=document.getElementById('v205-db-dist-search'), oldSelect=document.getElementById('v205-db-dist-group');
     if(!host||!search)return;
     const toolbar=search.closest('.toolbar');
+    const family=state.databaseV205Family||'distribution_recloser';
+    const browserKey=`distribution:${family}`;
+
+    /*
+     * v3.0.2: não recriar a galeria a cada mutação interna do próprio browser.
+     * O redraw dos filtros passa a ser responsabilidade exclusiva dos handlers
+     * locais abaixo. Isso elimina o efeito de "mal contato" nos botões e <details>.
+     */
+    const hasControls=!!toolbar?.querySelector('.v206-group-controls');
+    const hasBrowser=!!host.querySelector('.v206-db-groups,.v206-db-list');
+    if(host.dataset.v206BrowserKey===browserKey&&hasControls&&hasBrowser)return;
+    host.dataset.v206BrowserKey=browserKey;
+
     if(oldSelect){oldSelect.remove();}
     let controls=toolbar?.querySelector('.v206-group-controls');
     if(!controls&&toolbar){controls=document.createElement('div');controls.className='v206-group-controls';controls.innerHTML='<span>Visualizar por</span>'+[['region','Região'],['substation_code','Subestação'],['feeder','Alimentador'],['model','Modelo'],['','Todos']].map(([k,l])=>`<button type="button" data-v206-group="${k}">${l}</button>`).join('');toolbar.appendChild(controls);}
@@ -830,10 +851,21 @@
   const v206EarlierScheduleEnhancements=scheduleEnhancements;
   scheduleEnhancements=function(){
     v206EarlierScheduleEnhancements();
-    requestAnimationFrame(()=>{v206RenderDistributionBrowser();v206EnsureStandardBackButtons();});
+    requestAnimationFrame(()=>{
+      const host=document.getElementById('v205-db-dist-results');
+      const toolbar=document.getElementById('v205-db-dist-search')?.closest('.toolbar');
+      const needsDistributionBrowser=state?.screen==='database'&&state?.databaseFront==='distribution'&&
+        (!host?.querySelector('.v206-db-groups,.v206-db-list')||!toolbar?.querySelector('.v206-group-controls'));
+      if(needsDistributionBrowser)v206RenderDistributionBrowser();
+      v206EnsureStandardBackButtons();
+    });
   };
-  const v206FinalObserver=new MutationObserver(()=>requestAnimationFrame(()=>{v206RenderDistributionBrowser();v206EnsureStandardBackButtons();}));
-  if(main)v206FinalObserver.observe(main,{subtree:true,childList:true});
+
+  /*
+   * v3.0.2: removido o segundo MutationObserver que reconstruía Distribuição
+   * depois de cada clique/expansão. O observer histórico acima continua cuidando
+   * da entrada em novas telas, sem competir com os controles da galeria.
+   */
   requestAnimationFrame(()=>{v206RenderDistributionBrowser();v206EnsureStandardBackButtons();});
 
 })();
