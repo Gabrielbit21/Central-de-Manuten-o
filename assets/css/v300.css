@@ -1,0 +1,64 @@
+/* Central de Manutenção SE — v3.0.0 */
+
+/* Entrada Integração / Substituição no padrão da Nova Manutenção */
+.v300-integration-entry .page-heading,
+.v300-integration-entry .v205-ops-fronts{max-width:1590px;margin-left:auto;margin-right:auto}
+.v300-integration-entry .v300-entry-heading{margin-top:58px;margin-bottom:26px}
+.v300-integration-entry .v300-entry-back{margin-bottom:20px}
+.v300-integration-entry .v300-entry-heading h1{font-size:40px;margin:0 0 8px}
+.v300-integration-entry .v300-entry-heading p{font-size:16px;margin:0}
+.v300-integration-entry .v300-front-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.v300-integration-entry .v300-front-card{min-height:330px;align-content:start;padding:32px}
+.v300-integration-entry .v300-front-card .business-front-state{margin-top:auto;width:max-content}
+
+/* Comunicação como agrupamento nativo */
+.v209-communication-group .v300-communication-head{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:12px}
+.v209-communication-group .v300-communication-head .v300-comm-group-check{width:24px;height:24px;margin:0}
+.v209-communication-group .v209-communication-equip small{display:block;margin-top:4px}
+.mobile-selection-dock .selection-dock-copy{display:grid;gap:3px}
+.mobile-selection-dock .selection-dock-copy span,.mobile-selection-dock .selection-dock-copy small{display:block}
+.mobile-selection-dock #sel-preview{margin-left:0!important}
+
+/* Banco de Dados */
+.v206-db-group>summary{cursor:pointer;user-select:none}
+.v206-db-group>summary:hover{background:#f7fafb}
+.v206-db-group>summary::after{content:'›';font-size:22px;line-height:1;transform:rotate(90deg);transition:transform .15s ease;color:var(--muted);margin-left:10px}
+.v206-db-group[open]>summary::after{transform:rotate(-90deg)}
+.v300-db-asset-row{cursor:pointer}
+
+/* Ficha organizada */
+.v300-asset-detail{max-width:1240px;width:min(1240px,calc(100vw - 40px));max-height:calc(100vh - 52px);overflow:auto}
+.v300-detail-header{padding:4px 0 22px;border-bottom:1px solid var(--line)}
+.v300-detail-header h2{margin:8px 0 5px;font-size:28px}
+.v300-detail-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:26px;padding-top:20px}
+.v300-detail-profile{align-self:start;position:sticky;top:0;display:grid;gap:12px}
+.v300-profile-photo{width:100%;aspect-ratio:1/1;border:1px dashed #9cc8d4;border-radius:14px;background:#f3fbfd;color:var(--blue-dark);overflow:hidden;display:grid;place-items:center;align-content:center;gap:8px;cursor:pointer;padding:0}
+.v300-profile-photo img{width:100%;height:100%;object-fit:cover;grid-area:1/1}
+.v300-profile-photo img+span{grid-area:1/1;align-self:end;justify-self:stretch;background:rgba(0,0,0,.62);color:#fff;padding:9px;font-weight:800;font-size:11px;text-align:center}
+.v300-profile-photo>[data-icon]{width:48px;height:48px}
+.v300-profile-photo strong{font-size:12px;padding:0 14px}
+.v300-route-button{width:100%;justify-content:center;background:var(--orange)!important;border-color:var(--orange)!important}
+.v300-route-button:hover{filter:brightness(.96)}
+.v300-detail-content{min-width:0}
+.v300-detail-section{padding:0 0 20px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.v300-detail-section:last-child{border-bottom:0;margin-bottom:0}
+.v300-detail-section h3{margin:0 0 13px;font-size:17px}
+.v300-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.v300-detail-field{min-width:0;border:1px solid var(--line);background:#fbfcfd;border-radius:10px;padding:10px 12px}
+.v300-detail-field b{display:block;color:#50636e;font-size:10px;text-transform:uppercase;margin-bottom:4px}
+.v300-detail-field span{display:block;font-size:12px;overflow-wrap:anywhere}
+
+@media(max-width:900px){
+  .v300-integration-entry .v300-front-grid{grid-template-columns:1fr}
+  .v300-integration-entry .v300-front-card{min-height:220px}
+  .v300-detail-layout{grid-template-columns:1fr}
+  .v300-detail-profile{position:static;grid-template-columns:160px minmax(0,220px);align-items:end}
+  .v300-profile-photo{width:160px}
+}
+@media(max-width:620px){
+  .v300-integration-entry .v300-entry-heading{margin-top:24px}
+  .v300-integration-entry .v300-entry-heading h1{font-size:31px}
+  .v300-detail-profile{grid-template-columns:1fr}
+  .v300-profile-photo,.v300-route-button{width:150px}
+  .v300-detail-grid{grid-template-columns:1fr}
+}
