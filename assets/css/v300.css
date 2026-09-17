@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v3.0.2
+/* Central de Manutenção SE — v3.0.3
  * Sem estilos paralelos para Integração/Substituição:
  * a entrada usa diretamente o mesmo business-front-shell da Nova Manutenção.
  */
@@ -152,4 +152,43 @@
     grid-template-columns:1fr;
   }
 }
-\n\n/* ===== v3.0.2 — estabilização visual ===== */\n/* O cartão de login fica acima do rodapé; o rodapé permanece sobre a foto, atrás do cartão. */\n.auth-shell{\n  isolation:isolate;\n}\n.auth-shell .auth-wrap{\n  position:relative;\n  z-index:2!important;\n}\n.auth-shell .auth-build-footer{\n  z-index:1!important;\n}\n\n/* Estados cadastrais de Distribuição/Telecom */\n.v205-status.scrap{\n  background:#fdecec!important;\n  color:#b42318!important;\n  border:1px solid #f5c2c0;\n}\n.v205-status.warning{\n  background:#fff4e5!important;\n  color:#9a5700!important;\n  border:1px solid #f7d7a7;\n}\n.v205-status.reserve{\n  background:#eaf3ff!important;\n  color:#175cd3!important;\n  border:1px solid #c7dcff;\n}\n.v205-status.inactive{\n  background:#eef1f3!important;\n  color:#667085!important;\n  border:1px solid #d7dde1;\n}\n
+
+
+/* ===== v3.0.3 — estabilização visual ===== */
+/* O cartão de login fica acima do rodapé; o rodapé permanece sobre a foto, atrás do cartão. */
+.auth-shell{
+  isolation:isolate;
+}
+.auth-shell .auth-wrap{
+  position:relative;
+  z-index:2!important;
+}
+.auth-shell .auth-build-footer{
+  z-index:1!important;
+}
+
+/* Estados cadastrais de Distribuição/Telecom */
+.v205-status.scrap{
+  background:#fdecec!important;
+  color:#b42318!important;
+  border:1px solid #f5c2c0;
+}
+.v205-status.warning{
+  background:#fff4e5!important;
+  color:#9a5700!important;
+  border:1px solid #f7d7a7;
+}
+.v205-status.reserve{
+  background:#eaf3ff!important;
+  color:#175cd3!important;
+  border:1px solid #c7dcff;
+}
+.v205-status.inactive{
+  background:#eef1f3!important;
+  color:#667085!important;
+  border:1px solid #d7dde1;
+}
+
+
+/* ===== v3.0.3 — autenticação e estados ===== */
+.auth-shell .auth-build-footer.hidden{display:none!important}

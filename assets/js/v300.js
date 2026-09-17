@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v3.0.2
+/* Central de Manutenção SE — v3.0.3
  * Consolidação corretiva sem nova camada:
  * - mantém Comunicação como agrupamento nativo da Subestação;
  * - mantém saudação persistente do login;
@@ -10,7 +10,7 @@
 if(globalThis.__CENTRAL_V300__)return;
 globalThis.__CENTRAL_V300__=true;
 
-const V300_VERSION='3.0.2';
+const V300_VERSION='3.0.3';
 const safe=v=>String(v??'');
 const esc300=v=>safe(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
@@ -54,11 +54,11 @@ if(typeof storeIdentity==='function'){
 /* Corrige o chrome de versão que camadas históricas ainda tentam sobrescrever. */
 function v300SyncVersionChrome(){
   const footer=document.getElementById('environment-footer-version');
-  if(footer)footer.textContent='v3.0.2';
+  if(footer)footer.textContent='v3.0.3';
   const label=document.getElementById('app-version-label');
-  if(label)label.textContent='v3.0.2';
+  if(label)label.textContent='v3.0.3';
   if(document.title&&/v\d+\.\d+\.\d+/i.test(document.title)){
-    document.title=document.title.replace(/v\d+\.\d+\.\d+/ig,'v3.0.2');
+    document.title=document.title.replace(/v\d+\.\d+\.\d+/ig,'v3.0.3');
   }
 }
 
@@ -290,19 +290,19 @@ function styleIntegrationEntry(){
       </div>
     </div>
     <div class="business-front-grid">
-      <button type="button" class="business-front-card" data-v300-op-front="substation">
+      <button type="button" class="business-front-card" data-front="substation" data-v300-op-front="substation">
         <span class="business-front-icon" data-icon="settings"></span>
         <h2>Subestações</h2>
         <p>Integração e substituição de ativos de subestações.</p>
         <span class="business-front-state"><span data-icon="check"></span>Disponível</span>
       </button>
-      <button type="button" class="business-front-card" data-v300-op-front="distribution">
+      <button type="button" class="business-front-card" data-front="distribution" data-v300-op-front="distribution">
         <span class="business-front-icon" data-icon="tool"></span>
         <h2>Distribuição</h2>
         <p>Integração, substituição e comissionamento de religadores e reguladores.</p>
         <span class="business-front-state"><span data-icon="check"></span>Disponível</span>
       </button>
-      <button type="button" class="business-front-card" data-v300-op-front="telecom">
+      <button type="button" class="business-front-card" data-front="telecom" data-v300-op-front="telecom">
         <span class="business-front-icon" data-icon="wifi"></span>
         <h2>Telecom</h2>
         <p>Integração e instalação de ativos de Telecom.</p>

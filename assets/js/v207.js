@@ -25,6 +25,7 @@
   })[code]||safe(code).replace(/_/g,' ');
 
   function applyVersionChrome(){
+    if(globalThis.__CENTRAL_V300__)return;
     const title=document.title.replace(/v\d+\.\d+\.\d+/i,'v'+V207_VERSION);if(document.title!==title)document.title=title;
     const footer=document.getElementById('environment-footer-version');if(footer&&footer.textContent!==`v${V207_VERSION}`)footer.textContent=`v${V207_VERSION}`;
     const label=document.getElementById('app-version-label');if(label&&label.textContent!==`v${V207_VERSION}`)label.textContent=`v${V207_VERSION}`;
@@ -38,7 +39,7 @@
   }
   function firstName(name){return safe(name).trim().split(/\s+/)[0]||''}
   function updateLoginGreeting(){
-    /* v3.0.2: a saudação persistente pertence à camada v300. */
+    /* A saudação persistente pertence à camada v300. */
     if(globalThis.__CENTRAL_V300__)return;
     const shell=document.getElementById('auth-shell');if(!shell)return;
     const email=shell.querySelector('#login-form input[name="email"]')?.value||'';
@@ -318,8 +319,8 @@
   function excelSerialToDate(n){const base=Date.UTC(1899,11,30),ms=base+Number(n)*86400000;return new Date(ms)}
   function legacyValue(label,value){
     const l=norm(label);if(typeof value==='number'){
-      if(l.includes('DATA')){const d=excelSerialToDate(value);return d.toLocaleDateString('pt-BR')}
-      if(l.includes('HORA')||l.includes('INICIO')||l.includes('CONCLUSAO')||l.includes('FIM')){
+      if(l.includes('data')){const d=excelSerialToDate(value);return d.toLocaleDateString('pt-BR')}
+      if(l.includes('hora')||l.includes('inicio')||l.includes('conclusao')||l.includes('fim')){
         if(value<1){const total=Math.round(value*24*60),h=Math.floor(total/60)%24,m=total%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}
         const d=excelSerialToDate(value);return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`
       }
