@@ -1,4 +1,4 @@
-const SW_VERSION = '2.0.6-media-v6.0';
+const SW_VERSION = '2.0.7-media-v7.0';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -10,12 +10,15 @@ const APP_SHELL = [
   './assets/js/v205-preboot.js',
   './assets/js/v205.js',
   './assets/js/v206.js',
+  './assets/js/v207.js',
   './assets/js/media-core.js',
   './assets/css/v205.css',
   './assets/css/v206.css',
+  './assets/css/v207.css',
   './assets/css/media-core.css',
   './assets/data/v205/front-assets.json',
   './assets/data/v205/front-history.json',
+  './assets/data/v207/telecom-history.json',
   './assets/data/v205/stats.json',
   './vendor/supabase-js-2.57.4.min.js',
   './vendor/xlsx-0.20.3.full.min.js',
@@ -55,12 +58,15 @@ self.addEventListener('fetch', event => {
     '/assets/js/v205-preboot.js',
     '/assets/js/v205.js',
     '/assets/js/v206.js',
+    '/assets/js/v207.js',
     '/assets/js/media-core.js',
     '/assets/css/v205.css',
     '/assets/css/v206.css',
+    '/assets/css/v207.css',
     '/assets/css/media-core.css',
     '/assets/data/v205/front-assets.json',
     '/assets/data/v205/front-history.json',
+    '/assets/data/v207/telecom-history.json',
   ].some(path => url.pathname.endsWith(path));
   if (request.mode === 'navigate' || url.pathname.endsWith('/version.json') || criticalCode) {
     event.respondWith((async () => {
