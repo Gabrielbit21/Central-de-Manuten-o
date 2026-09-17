@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.1'}};
-const APP_VERSION='3.0.1';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.2'}};
+const APP_VERSION='3.0.2';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.1.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.2.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1769,8 +1769,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='3.0.1';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='3.0.2';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1851,7 +1851,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';
 };
 
 
@@ -1882,7 +1882,7 @@ function standardMaintenanceExportRow(report){
   const date=form.data||raw.data||report.date||report.createdAt,created=report.createdAt||raw.criadoEm||raw.created_at||date;
   return {ID_RELATORIO:exportSafeText(report.id),NUMERO_RELATORIO:exportSafeText(report.number||raw.numeroRelatorio||raw.report_number),DATA_ATENDIMENTO:exportIsoDate(date),DATA_CRIACAO:exportDateTime(created),FAMILIA_ATIVO:families.map(exportFamilyLabel).join(' / '),LOCAL:exportSafeText(sub.nome||report.substation),SIGLA_LOCAL:exportSafeText(sub.sigla||report.subId),REGIAO:exportSafeText(sub.regiao),EQUIPE_RESPONSAVEL:exportSafeText(canonicalTeamName(report.author||form.equipe||raw.equipe)),TIPO_MANUTENCAO:exportSafeText(report.type||form.tipo||raw.tipoManutencao),ORDEM_SERVICO:exportSafeText(form.os||raw.os||payload.ordemServico),INICIO:exportSafeText(form.inicio||raw.inicio),FIM:exportSafeText(form.fim||raw.fim),ATIVOS:(report.assets||[]).join(' | '),IDS_ATIVOS:assetIds.join(' | '),STATUS_RELATORIO:exportStatusLabel(report.status),RESULTADO:report.outcome==='inconclusivo'?'Inconclusivo':'Concluído',REVISAO:Number(raw.revisao||raw.revision||1),DEFEITO:exportSafeText(form.defeito||raw.defeito),CAUSA:exportSafeText(form.causa||raw.causa),REPARO_REALIZADO:exportSafeText(form.reparo||raw.reparo),CONFIGURACAO:exportSafeText(form.configuracao||raw.configuracao),PECA_SUBSTITUIDA:exportSafeText(form.peca||raw.pecaSubstituida),DESTINO_PECA:exportSafeText(form.destinoPeca||raw.destinoPeca),COMENTARIOS:exportSafeText(form.comentarios||raw.comentarios),NECESSARIO_RETORNO:exportSafeText(form.retorno||raw.necessitaRetorno),MOTIVO_DEVOLUCAO:exportSafeText(raw.motivoReprovacao||raw.rejection_reason),FONTE:report.source==='imported'?'Histórico importado':report.source==='local'?'Registro local':'Central de Manutenção'}
 }
-/* ===== v3.0.1 — exportação multi-frente no MESMO componente ===== */
+/* ===== v3.0.2 — exportação multi-frente no MESMO componente ===== */
 function v301ExportReportFront(report){
   return report?.businessFront
     || report?.raw?.businessFront
@@ -2043,7 +2043,7 @@ async function v301ExportDatasets(){
   [...live,...imported].forEach(row=>byId.set(`${row.FONTE}|${row.ID_RELATORIO}`,row));
   return {front,assets,reports:[...byId.values()]};
 }
-/* ===== fim v3.0.1 exportação multi-frente ===== */
+/* ===== fim v3.0.2 exportação multi-frente ===== */
 function exportPeriodBounds(preset,fromValue,toValue){const now=new Date(),start=new Date(now),end=new Date(now);start.setHours(0,0,0,0);end.setHours(23,59,59,999);if(preset==='week'){const day=(now.getDay()+6)%7;start.setDate(now.getDate()-day)}else if(preset==='month'){start.setDate(1)}else if(preset==='previous_month'){start.setMonth(now.getMonth()-1,1);end.setDate(0)}else if(preset==='last30'){start.setDate(now.getDate()-29)}else if(preset==='custom'){const f=fromValue?new Date(fromValue+'T00:00:00'):null,t=toValue?new Date(toValue+'T23:59:59'):null;return {start:f&&!Number.isNaN(f)?f:null,end:t&&!Number.isNaN(t)?t:null,label:[fromValue||'início',toValue||'hoje'].join(' a ')}}else return {start:null,end:null,label:'Todo o período'};return {start,end,label:`${start.toLocaleDateString('pt-BR')} a ${end.toLocaleDateString('pt-BR')}`}}
 function exportReportDateMs(row){const value=row.DATA_ATENDIMENTO||row.DATA_CRIACAO;if(!value)return 0;const br=String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})/);const d=br?new Date(`${br[3]}-${br[2]}-${br[1]}T12:00:00`):new Date(value+'T12:00:00');return Number.isNaN(d.getTime())?0:d.getTime()}
 function exportApplyMaintenanceFilters(rows,filters){const bounds=exportPeriodBounds(filters.period,filters.from,filters.to),start=bounds.start?.getTime()??-Infinity,end=bounds.end?.getTime()??Infinity;return rows.filter(row=>{const time=exportReportDateMs(row);return time>=start&&time<=end&&(!filters.team||row.EQUIPE_RESPONSAVEL===filters.team)&&(!filters.substation||row.SIGLA_LOCAL===filters.substation)&&(!filters.status||row.STATUS_RELATORIO===filters.status)&&(!filters.family||row.FAMILIA_ATIVO.includes(exportFamilyLabel(filters.family)))})}
@@ -2101,7 +2101,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2193,8 +2193,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.2';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.2';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3208,7 +3208,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.1 — fundação multi-frente e equipe executante padronizada ===== */
+/* ===== v3.0.2 — fundação multi-frente e equipe executante padronizada ===== */
 state.businessFront = state.businessFront || null;
 state.businessFronts = state.businessFronts || [
   {code:'substation',label:'Subestações',active:true,sort_order:10},
@@ -3344,7 +3344,7 @@ async function loadV200Auxiliary(){
     await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null});
     applyV200Auxiliary(data);
   }catch(error){
-    console.warn('v3.0.1 diretório de colaboradores:',error?.message||error);
+    console.warn('v3.0.2 diretório de colaboradores:',error?.message||error);
     const cached=await idbGet('cloudCache',key);
     if(cached?.data)return applyV200Auxiliary(cached.data);
     /* Fallback seguro durante homologação: usa o diretório de perfis
@@ -3496,7 +3496,7 @@ ensureReportChildren=async function(record,user){
     const {error:insertError}=await cloudClient.from('maintenance_report_participants').insert(rows);
     if(insertError&&insertError.code!=='23505')throw insertError;
   }catch(error){
-    console.warn('v3.0.1 participantes:',error?.message||error);
+    console.warn('v3.0.2 participantes:',error?.message||error);
     if(error?.code!=='42P01')throw error;
   }
 };
@@ -3534,7 +3534,7 @@ injectMyReportsOnHome=async function(){
   });
 };
 
-/* Estado visual da Home v3.0.1 */
+/* Estado visual da Home v3.0.2 */
 const _v200SetActiveNav=setActiveNav;
 setActiveNav=function(target){
   const result=_v200SetActiveNav(target);
@@ -3543,7 +3543,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.1 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
+/* ===== v3.0.2 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
 
 function v201AssetHistoryCacheKey(assetId){
   const uid=state.cloudUser?.id||'anonymous';
@@ -3598,7 +3598,7 @@ async function v201FullAssetHistory(asset,subId=state.sub){
       await idbPut('cloudCache',{key,data:rows,updatedAt:new Date().toISOString(),userId:state.cloudUser.id});
       return rows;
     }catch(error){
-      console.warn('v3.0.1 histórico do ativo:',error?.message||error);
+      console.warn('v3.0.2 histórico do ativo:',error?.message||error);
     }
   }
   const cached=await idbGet('cloudCache',key).catch(()=>null);
