@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.0'}};
-const APP_VERSION='3.0.0';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.0.1'}};
+const APP_VERSION='3.0.1';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -701,7 +701,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.0.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.0.1.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -1769,8 +1769,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.0';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='3.0.0';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='3.0.1';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -1851,12 +1851,12 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.0';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';
 };
 
 
 /* ===== v1.5.0 — exportação Excel padronizada + preparação multi-família ===== */
-const ASSET_FAMILY_LABELS={SUBESTACAO:'Ativo de Subestação',REPETIDORA:'Repetidora',RELIGADOR_DISTRIBUICAO:'Religador de Distribuição'};
+const ASSET_FAMILY_LABELS={SUBESTACAO:'Ativo de Subestação',REPETIDORA:'Repetidora',RELIGADOR_DISTRIBUICAO:'Religador de Distribuição',REGULADOR_TENSAO:'Regulador de Tensão',SITE_TELECOM:'Site de Telecom',RADIO_VOZ_VHF:'Rádio de Voz VHF',RADIO_DADOS_UHF:'Rádio de Dados UHF',RADIO_MICROONDAS:'Rádio Micro-ondas',CONVERSOR_125_12:'Conversor 125/12 Vcc',CONVERSOR_125_48:'Conversor 125/48 Vcc',ROTEADOR_SWITCH:'Roteador / Switch',CLAROTY:'Claroty'};
 const EXPORT_SCHEMA_VERSION='CMSE_EXPORT_V1';
 const EXPORT_ASSET_HEADERS=['ID_ATIVO','FAMILIA_ATIVO','EMPRESA','REGIAO','LOCAL','SIGLA_LOCAL','CATEGORIA','TIPO_ATIVO','LOCALIZACAO','CIRCUITO','FABRICANTE','MODELO','NUMERO_SERIE','NUMERO_OPERATIVO','IDENTIFICACAO','OBSERVACOES','VERSAO_REGISTRO','ULTIMA_MANUTENCAO'];
 const EXPORT_MAINT_HEADERS=['ID_RELATORIO','NUMERO_RELATORIO','DATA_ATENDIMENTO','DATA_CRIACAO','FAMILIA_ATIVO','LOCAL','SIGLA_LOCAL','REGIAO','EQUIPE_RESPONSAVEL','TIPO_MANUTENCAO','ORDEM_SERVICO','INICIO','FIM','ATIVOS','IDS_ATIVOS','STATUS_RELATORIO','RESULTADO','REVISAO','DEFEITO','CAUSA','REPARO_REALIZADO','CONFIGURACAO','PECA_SUBSTITUIDA','DESTINO_PECA','COMENTARIOS','NECESSARIO_RETORNO','MOTIVO_DEVOLUCAO','FONTE'];
@@ -1882,6 +1882,168 @@ function standardMaintenanceExportRow(report){
   const date=form.data||raw.data||report.date||report.createdAt,created=report.createdAt||raw.criadoEm||raw.created_at||date;
   return {ID_RELATORIO:exportSafeText(report.id),NUMERO_RELATORIO:exportSafeText(report.number||raw.numeroRelatorio||raw.report_number),DATA_ATENDIMENTO:exportIsoDate(date),DATA_CRIACAO:exportDateTime(created),FAMILIA_ATIVO:families.map(exportFamilyLabel).join(' / '),LOCAL:exportSafeText(sub.nome||report.substation),SIGLA_LOCAL:exportSafeText(sub.sigla||report.subId),REGIAO:exportSafeText(sub.regiao),EQUIPE_RESPONSAVEL:exportSafeText(canonicalTeamName(report.author||form.equipe||raw.equipe)),TIPO_MANUTENCAO:exportSafeText(report.type||form.tipo||raw.tipoManutencao),ORDEM_SERVICO:exportSafeText(form.os||raw.os||payload.ordemServico),INICIO:exportSafeText(form.inicio||raw.inicio),FIM:exportSafeText(form.fim||raw.fim),ATIVOS:(report.assets||[]).join(' | '),IDS_ATIVOS:assetIds.join(' | '),STATUS_RELATORIO:exportStatusLabel(report.status),RESULTADO:report.outcome==='inconclusivo'?'Inconclusivo':'Concluído',REVISAO:Number(raw.revisao||raw.revision||1),DEFEITO:exportSafeText(form.defeito||raw.defeito),CAUSA:exportSafeText(form.causa||raw.causa),REPARO_REALIZADO:exportSafeText(form.reparo||raw.reparo),CONFIGURACAO:exportSafeText(form.configuracao||raw.configuracao),PECA_SUBSTITUIDA:exportSafeText(form.peca||raw.pecaSubstituida),DESTINO_PECA:exportSafeText(form.destinoPeca||raw.destinoPeca),COMENTARIOS:exportSafeText(form.comentarios||raw.comentarios),NECESSARIO_RETORNO:exportSafeText(form.retorno||raw.necessitaRetorno),MOTIVO_DEVOLUCAO:exportSafeText(raw.motivoReprovacao||raw.rejection_reason),FONTE:report.source==='imported'?'Histórico importado':report.source==='local'?'Registro local':'Central de Manutenção'}
 }
+/* ===== v3.0.1 — exportação multi-frente no MESMO componente ===== */
+function v301ExportReportFront(report){
+  return report?.businessFront
+    || report?.raw?.businessFront
+    || report?.raw?.business_front
+    || report?.raw?.payload?.business_front
+    || 'substation';
+}
+function v301FrontExportFamilyCode(asset){
+  return ({
+    distribution_recloser:'RELIGADOR_DISTRIBUICAO',
+    voltage_regulator:'REGULADOR_TENSAO',
+    repeater:'REPETIDORA',
+    telecom_site:'SITE_TELECOM',
+    radio_voice_vhf:'RADIO_VOZ_VHF',
+    radio_data_uhf:'RADIO_DADOS_UHF',
+    radio_microwave:'RADIO_MICROONDAS',
+    converter_125_12:'CONVERSOR_125_12',
+    converter_125_12_detailed:'CONVERSOR_125_12',
+    converter_125_48:'CONVERSOR_125_48',
+    router:'ROTEADOR_SWITCH',
+    claroty:'CLAROTY'
+  })[asset?.family_code]||String(asset?.family_code||'ATIVO').toUpperCase();
+}
+function v301FrontExportCategory(asset){
+  return ({
+    distribution_recloser:'Religadores',
+    voltage_regulator:'Reguladores de Tensão',
+    repeater:'Repetidoras',
+    telecom_site:'Sites de Telecom'
+  })[asset?.family_code]||(asset?.business_front==='telecom'?'Comunicação':'Distribuição');
+}
+function v301FrontExportAssetRows(front){
+  return (state.frontAssets||[])
+    .filter(asset=>asset.active!==false&&asset.business_front===front)
+    .map(asset=>{
+      const sub=DATA.substations.find(item=>item.sigla===asset.substation_code)||{};
+      const code=v301FrontExportFamilyCode(asset);
+      return {
+        ID_ATIVO:exportSafeText(asset.id),
+        FAMILIA_ATIVO:exportFamilyLabel(code),
+        EMPRESA:exportSafeText(sub.empresa),
+        REGIAO:exportSafeText(asset.region||sub.regiao),
+        LOCAL:exportSafeText(asset.location_name||asset.display_name||asset.data?.city||asset.substation_code),
+        SIGLA_LOCAL:exportSafeText(asset.substation_code||asset.region||asset.data?.city||asset.display_name),
+        CATEGORIA:exportSafeText(v301FrontExportCategory(asset)),
+        TIPO_ATIVO:exportSafeText(asset.operating_code||asset.display_name||exportFamilyLabel(code)),
+        LOCALIZACAO:exportSafeText(asset.location_name||asset.data?.address),
+        CIRCUITO:exportSafeText(asset.feeder),
+        FABRICANTE:exportSafeText(asset.manufacturer),
+        MODELO:exportSafeText(asset.model),
+        NUMERO_SERIE:exportSafeText(asset.serial_number),
+        NUMERO_OPERATIVO:exportSafeText(asset.operating_code),
+        IDENTIFICACAO:exportSafeText(asset.external_key),
+        OBSERVACOES:exportSafeText(asset.data?.notes||asset.data?.observations),
+        VERSAO_REGISTRO:Number(asset.row_version||1),
+        ULTIMA_MANUTENCAO:exportIsoDate(asset.last_maintenance_date),
+        __FRONT:front
+      };
+    })
+    .sort((a,b)=>`${a.FAMILIA_ATIVO} ${a.SIGLA_LOCAL} ${a.TIPO_ATIVO}`.localeCompare(`${b.FAMILIA_ATIVO} ${b.SIGLA_LOCAL} ${b.TIPO_ATIVO}`,'pt-BR',{numeric:true}));
+}
+function v301FrontReportAssets(report){
+  const raw=report?.raw||{};
+  const ids=raw.frontAssetIds||raw.front_asset_ids||raw.payload?.frontAssetIds||[];
+  const snapshots=raw.frontAssetsSnapshot||raw.payload?.frontAssetsSnapshot||[];
+  const byId=new Map((state.frontAssets||[]).map(asset=>[String(asset.id),asset]));
+  const result=[];
+  for(const id of Array.isArray(ids)?ids:[]){
+    const asset=byId.get(String(id));
+    if(asset)result.push(asset);
+  }
+  for(const asset of Array.isArray(snapshots)?snapshots:[]){
+    if(asset&&!result.some(item=>String(item.id)===String(asset.id)))result.push(asset);
+  }
+  return result;
+}
+function v301StandardFrontMaintenanceRow(report){
+  const row=standardMaintenanceExportRow(report);
+  const front=v301ExportReportFront(report);
+  const assets=v301FrontReportAssets(report);
+  const raw=report?.raw||{};
+  const rawIds=raw.frontAssetIds||raw.front_asset_ids||raw.payload?.frontAssetIds||[];
+  const ids=(Array.isArray(rawIds)&&rawIds.length?rawIds:assets.map(asset=>asset.id)).map(String);
+  const families=[...new Set(assets.map(asset=>exportFamilyLabel(v301FrontExportFamilyCode(asset))))];
+  const first=assets[0]||{};
+  row.FAMILIA_ATIVO=families.join(' / ')||row.FAMILIA_ATIVO;
+  row.LOCAL=exportSafeText(report.substation||first.location_name||first.display_name||first.data?.city);
+  row.SIGLA_LOCAL=exportSafeText(first.substation_code||first.region||first.data?.city||report.subId);
+  row.REGIAO=exportSafeText(first.region);
+  row.ATIVOS=(report.assets||assets.map(asset=>asset.operating_code||asset.display_name)).join(' | ');
+  row.IDS_ATIVOS=ids.join(' | ');
+  row.__FRONT=front;
+  return row;
+}
+function v301FrontHistoryExportRows(front){
+  const assets=state.frontAssets||[];
+  return (state.frontHistory||[])
+    .filter(history=>(history.business_front||'distribution')===front)
+    .map(history=>{
+      const asset=assets.find(item=>
+        item.business_front===front
+        && (!history.family_code||item.family_code===history.family_code)
+        && String(item.operating_code||item.display_name||'')===String(history.operating_code||'')
+      );
+      const familyCode=asset?v301FrontExportFamilyCode(asset):({
+        distribution_recloser:'RELIGADOR_DISTRIBUICAO',
+        voltage_regulator:'REGULADOR_TENSAO',
+        repeater:'REPETIDORA'
+      })[history.family_code]||'ATIVO';
+      return {
+        ID_RELATORIO:exportSafeText(history.id||history.source_key),
+        NUMERO_RELATORIO:exportSafeText(history.work_order||history.source_key||history.id),
+        DATA_ATENDIMENTO:exportIsoDate(history.occurred_on),
+        DATA_CRIACAO:exportDateTime(history.occurred_on),
+        FAMILIA_ATIVO:exportFamilyLabel(familyCode),
+        LOCAL:exportSafeText(asset?.location_name||asset?.display_name||history.location_name),
+        SIGLA_LOCAL:exportSafeText(asset?.substation_code||asset?.region||history.substation_code),
+        REGIAO:exportSafeText(asset?.region||history.region),
+        EQUIPE_RESPONSAVEL:exportSafeText(history.team),
+        TIPO_MANUTENCAO:exportSafeText(history.maintenance_type||'Atendimento'),
+        ORDEM_SERVICO:exportSafeText(history.work_order),
+        INICIO:'',
+        FIM:'',
+        ATIVOS:exportSafeText(history.operating_code||asset?.display_name),
+        IDS_ATIVOS:exportSafeText(asset?.id),
+        STATUS_RELATORIO:'Histórico importado',
+        RESULTADO:'Concluído',
+        REVISAO:1,
+        DEFEITO:'',
+        CAUSA:'',
+        REPARO_REALIZADO:exportSafeText(history.summary),
+        CONFIGURACAO:'',
+        PECA_SUBSTITUIDA:'',
+        DESTINO_PECA:'',
+        COMENTARIOS:exportSafeText(history.summary),
+        NECESSARIO_RETORNO:'',
+        MOTIVO_DEVOLUCAO:'',
+        FONTE:'Histórico importado',
+        __FRONT:front
+      };
+    });
+}
+async function v301ExportDatasets(){
+  const front=state.databaseFront||'substation';
+  if(front==='substation'){
+    return {
+      front,
+      assets:standardAssetExportRows(),
+      reports:(await combinedReports()).filter(report=>v301ExportReportFront(report)==='substation').map(standardMaintenanceExportRow)
+    };
+  }
+  const assets=v301FrontExportAssetRows(front);
+  const live=(await combinedReports())
+    .filter(report=>v301ExportReportFront(report)===front)
+    .map(v301StandardFrontMaintenanceRow);
+  const imported=v301FrontHistoryExportRows(front);
+  const byId=new Map();
+  [...live,...imported].forEach(row=>byId.set(`${row.FONTE}|${row.ID_RELATORIO}`,row));
+  return {front,assets,reports:[...byId.values()]};
+}
+/* ===== fim v3.0.1 exportação multi-frente ===== */
 function exportPeriodBounds(preset,fromValue,toValue){const now=new Date(),start=new Date(now),end=new Date(now);start.setHours(0,0,0,0);end.setHours(23,59,59,999);if(preset==='week'){const day=(now.getDay()+6)%7;start.setDate(now.getDate()-day)}else if(preset==='month'){start.setDate(1)}else if(preset==='previous_month'){start.setMonth(now.getMonth()-1,1);end.setDate(0)}else if(preset==='last30'){start.setDate(now.getDate()-29)}else if(preset==='custom'){const f=fromValue?new Date(fromValue+'T00:00:00'):null,t=toValue?new Date(toValue+'T23:59:59'):null;return {start:f&&!Number.isNaN(f)?f:null,end:t&&!Number.isNaN(t)?t:null,label:[fromValue||'início',toValue||'hoje'].join(' a ')}}else return {start:null,end:null,label:'Todo o período'};return {start,end,label:`${start.toLocaleDateString('pt-BR')} a ${end.toLocaleDateString('pt-BR')}`}}
 function exportReportDateMs(row){const value=row.DATA_ATENDIMENTO||row.DATA_CRIACAO;if(!value)return 0;const br=String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})/);const d=br?new Date(`${br[3]}-${br[2]}-${br[1]}T12:00:00`):new Date(value+'T12:00:00');return Number.isNaN(d.getTime())?0:d.getTime()}
 function exportApplyMaintenanceFilters(rows,filters){const bounds=exportPeriodBounds(filters.period,filters.from,filters.to),start=bounds.start?.getTime()??-Infinity,end=bounds.end?.getTime()??Infinity;return rows.filter(row=>{const time=exportReportDateMs(row);return time>=start&&time<=end&&(!filters.team||row.EQUIPE_RESPONSAVEL===filters.team)&&(!filters.substation||row.SIGLA_LOCAL===filters.substation)&&(!filters.status||row.STATUS_RELATORIO===filters.status)&&(!filters.family||row.FAMILIA_ATIVO.includes(exportFamilyLabel(filters.family)))})}
@@ -1906,7 +2068,7 @@ function exportSummarySheet(wb,maintenance,assets){const statusCounts=new Map();
 function exportFileName(prefix){return `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`.replace(/[^a-zA-Z0-9À-ÿ_.-]+/g,'_')}
 async function buildStandardExport(mode,filters){
   if(!spreadsheetModuleReady())return;
-  const allReports=(await combinedReports()).map(standardMaintenanceExportRow),allAssets=standardAssetExportRows(),filteredMaint=exportApplyMaintenanceFilters(allReports,filters),filteredAssets=exportApplyAssetFilters(allAssets,filters),bounds=exportPeriodBounds(filters.period,filters.from,filters.to),wb=XLSX.utils.book_new();
+  const dataset=await v301ExportDatasets(),allReports=dataset.reports,allAssets=dataset.assets,filteredMaint=exportApplyMaintenanceFilters(allReports,filters),filteredAssets=exportApplyAssetFilters(allAssets,filters),bounds=exportPeriodBounds(filters.period,filters.from,filters.to),wb=XLSX.utils.book_new();
   const labels={assets:'Base de Ativos',maintenance:'Manutenções',history:'Histórico por Ativo',consolidated:'Workbook Consolidado'};
   let assets=filteredAssets,maintenance=filteredMaint,file='Central_Dados';
   if(mode==='assets'){maintenance=[];file='Central_Base_Ativos'}
@@ -1925,7 +2087,7 @@ async function buildStandardExport(mode,filters){
 }
 function exportCurrentFilterValues(root){return {period:root.querySelector('#export-period')?.value||'all',from:root.querySelector('#export-date-from')?.value||'',to:root.querySelector('#export-date-to')?.value||'',team:root.querySelector('#export-team')?.value||'',substation:root.querySelector('#export-substation')?.value||'',status:root.querySelector('#export-status')?.value||'',family:root.querySelector('#export-family')?.value||'',category:root.querySelector('#export-category')?.value||'',asset:root.querySelector('#export-asset')?.value||''}}
 async function openDataExportDialog(){
-  if(!spreadsheetModuleReady())return;const reports=(await combinedReports()).map(standardMaintenanceExportRow),assets=standardAssetExportRows(),teams=[...new Set(reports.map(r=>canonicalTeamName(r.EQUIPE_RESPONSAVEL)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),subs=[...new Set([...assets.map(a=>a.SIGLA_LOCAL),...reports.map(r=>r.SIGLA_LOCAL)].filter(Boolean))].sort(),statuses=[...new Set(reports.map(r=>r.STATUS_RELATORIO).filter(Boolean))].sort(),families=[...new Set(assets.map(a=>Object.entries(ASSET_FAMILY_LABELS).find(([,label])=>label===a.FAMILIA_ATIVO)?.[0]||'SUBESTACAO'))],categories=[...new Set(assets.map(a=>a.CATEGORIA).filter(Boolean))].sort(),assetOptions=assets.map(a=>({id:a.ID_ATIVO,label:`${a.SIGLA_LOCAL} · ${a.TIPO_ATIVO}${a.CIRCUITO?' — '+a.CIRCUITO:''}`})).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR',{numeric:true}));
+  if(!spreadsheetModuleReady())return;const dataset=await v301ExportDatasets(),reports=dataset.reports,assets=dataset.assets,teams=[...new Set(reports.map(r=>canonicalTeamName(r.EQUIPE_RESPONSAVEL)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),subs=[...new Set([...assets.map(a=>a.SIGLA_LOCAL),...reports.map(r=>r.SIGLA_LOCAL)].filter(Boolean))].sort(),statuses=[...new Set(reports.map(r=>r.STATUS_RELATORIO).filter(Boolean))].sort(),families=[...new Set(assets.map(a=>Object.entries(ASSET_FAMILY_LABELS).find(([,label])=>label===a.FAMILIA_ATIVO)?.[0]||'SUBESTACAO'))],categories=[...new Set(assets.map(a=>a.CATEGORIA).filter(Boolean))].sort(),assetOptions=assets.map(a=>({id:a.ID_ATIVO,label:`${a.SIGLA_LOCAL} · ${a.TIPO_ATIVO}${a.CIRCUITO?' — '+a.CIRCUITO:''}`})).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR',{numeric:true}));
   const root=document.getElementById('modal-root');root.innerHTML=`<div class="modal no-backdrop-close" id="data-export-modal"><div class="modal-card data-export-dialog"><button class="modal-close" id="close-data-export" type="button" aria-label="Fechar"><span data-icon="x"></span></button><div class="export-header"><div><h2>Exportar dados</h2><p>Gere planilhas padronizadas da base cadastral e das manutenções, com filtros e rastreabilidade da exportação.</p></div></div><div class="export-mode-grid"><button class="export-mode-card active" data-export-mode="assets" type="button"><span data-icon="database"></span><strong>Base de ativos</strong><small>Cadastro técnico padronizado dos ativos.</small></button><button class="export-mode-card" data-export-mode="maintenance" type="button"><span data-icon="clipboard"></span><strong>Manutenções</strong><small>Período, equipe, local e situação do relatório.</small></button><button class="export-mode-card" data-export-mode="history" type="button"><span data-icon="history"></span><strong>Histórico por ativo</strong><small>Ficha cadastral e atendimentos do ativo selecionado.</small></button><button class="export-mode-card" data-export-mode="consolidated" type="button"><span data-icon="file-spreadsheet"></span><strong>Consolidado</strong><small>Ativos, manutenções, resumo e dicionário em um único arquivo.</small></button></div><section class="export-filter-panel"><div class="export-filter-title"><strong>Filtros da exportação</strong><small>Os filtros não alteram a base.</small></div><div class="export-filter-grid"><div class="export-field" data-filter="family"><label>Família do ativo</label><select id="export-family"><option value="">Todas</option>${families.map(code=>`<option value="${esc(code)}">${esc(exportFamilyLabel(code))}</option>`).join('')}</select></div><div class="export-field" data-filter="substation"><label>Local</label><select id="export-substation"><option value="">Todos</option>${subs.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div><div class="export-field" data-filter="category"><label>Categoria</label><select id="export-category"><option value="">Todas</option>${categories.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div><div class="export-field hidden" data-filter="period"><label>Período</label><select id="export-period"><option value="week">Esta semana</option><option value="month" selected>Este mês</option><option value="previous_month">Mês anterior</option><option value="last30">Últimos 30 dias</option><option value="all">Todo o período</option><option value="custom">Personalizado</option></select></div><div class="export-custom-dates hidden" id="export-custom-dates"><div class="export-field"><label>De</label><input id="export-date-from" type="date"></div><div class="export-field"><label>Até</label><input id="export-date-to" type="date"></div></div><div class="export-field hidden" data-filter="team"><label>Equipe</label><select id="export-team"><option value="">Todas</option>${teams.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div><div class="export-field hidden" data-filter="status"><label>Status</label><select id="export-status"><option value="">Todos</option>${statuses.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div><div class="export-field hidden" data-filter="asset"><label>Ativo</label><select id="export-asset"><option value="">Selecione…</option>${assetOptions.map(a=>`<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('')}</select></div></div></section><div class="export-preview-strip" id="export-preview-strip"></div><div class="export-actions single-action"><button class="btn primary excel-orange" id="generate-data-export" type="button">📊 Exportar Excel (.xlsx)</button></div></div></div>`;
   hydrateIcons(root);let mode='assets';const close=()=>root.innerHTML='';root.querySelector('#close-data-export').onclick=close;root.querySelector('#data-export-modal').onclick=e=>{if(e.target===e.currentTarget)e.stopPropagation()};
   const field=(name)=>root.querySelector(`[data-filter="${name}"]`),custom=root.querySelector('#export-custom-dates');
@@ -1939,7 +2101,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.0';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.0'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2031,8 +2193,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.0';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.0';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.0.1';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.0.1';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };
@@ -3046,7 +3208,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.0 — fundação multi-frente e equipe executante padronizada ===== */
+/* ===== v3.0.1 — fundação multi-frente e equipe executante padronizada ===== */
 state.businessFront = state.businessFront || null;
 state.businessFronts = state.businessFronts || [
   {code:'substation',label:'Subestações',active:true,sort_order:10},
@@ -3182,7 +3344,7 @@ async function loadV200Auxiliary(){
     await idbPut('cloudCache',{key,data,updatedAt:new Date().toISOString(),userId:state.cloudUser?.id||null});
     applyV200Auxiliary(data);
   }catch(error){
-    console.warn('v3.0.0 diretório de colaboradores:',error?.message||error);
+    console.warn('v3.0.1 diretório de colaboradores:',error?.message||error);
     const cached=await idbGet('cloudCache',key);
     if(cached?.data)return applyV200Auxiliary(cached.data);
     /* Fallback seguro durante homologação: usa o diretório de perfis
@@ -3334,7 +3496,7 @@ ensureReportChildren=async function(record,user){
     const {error:insertError}=await cloudClient.from('maintenance_report_participants').insert(rows);
     if(insertError&&insertError.code!=='23505')throw insertError;
   }catch(error){
-    console.warn('v3.0.0 participantes:',error?.message||error);
+    console.warn('v3.0.1 participantes:',error?.message||error);
     if(error?.code!=='42P01')throw error;
   }
 };
@@ -3372,7 +3534,7 @@ injectMyReportsOnHome=async function(){
   });
 };
 
-/* Estado visual da Home v3.0.0 */
+/* Estado visual da Home v3.0.1 */
 const _v200SetActiveNav=setActiveNav;
 setActiveNav=function(target){
   const result=_v200SetActiveNav(target);
@@ -3381,7 +3543,7 @@ setActiveNav=function(target){
 };
 
 
-/* ===== v3.0.0 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
+/* ===== v3.0.1 — refinamentos visuais, histórico seguro e vínculo de técnicos ===== */
 
 function v201AssetHistoryCacheKey(assetId){
   const uid=state.cloudUser?.id||'anonymous';
@@ -3436,7 +3598,7 @@ async function v201FullAssetHistory(asset,subId=state.sub){
       await idbPut('cloudCache',{key,data:rows,updatedAt:new Date().toISOString(),userId:state.cloudUser.id});
       return rows;
     }catch(error){
-      console.warn('v3.0.0 histórico do ativo:',error?.message||error);
+      console.warn('v3.0.1 histórico do ativo:',error?.message||error);
     }
   }
   const cached=await idbGet('cloudCache',key).catch(()=>null);
