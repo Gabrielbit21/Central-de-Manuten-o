@@ -263,17 +263,7 @@
 
   function openRepeaterMiniDetails(rep) {
     if (!rep) return;
-    const root = document.getElementById('modal-root');
-    if (!root) return;
-    const rows = [
-      ['Cidade', rep.data?.city], ['Regional', rep.region], ['CPS', rep.data?.cps], ['Estrutura', rep.data?.structure_type],
-      ['Altura', rep.data?.structure_height_m ? `${rep.data.structure_height_m} m` : ''], ['Meio principal', rep.data?.primary_comm_medium],
-      ['Rede principal', rep.data?.primary_network_type], ['Bancos 48 V', rep.data?.battery_48v_banks], ['Tipo bateria', rep.data?.battery_type],
-      ['Acesso seco', rep.data?.road_dry], ['Acesso chuva', rep.data?.road_rain]
-    ].filter(([,v]) => v !== null && v !== undefined && safe(v).trim() && v !== '-');
-    root.innerHTML = `<div class="modal" id="v206-repeater-modal"><div class="modal-card v206-mini-modal"><button class="modal-close" type="button" data-v206-modal-close><span data-icon="x"></span></button><h2>${escapeHtml(rep.display_name)}</h2><p class="muted">Ficha resumida da repetidora</p><div class="v206-folder-grid">${rows.map(([k,v]) => `<div><b>${escapeHtml(k)}</b><span>${escapeHtml(detailValue(v))}</span></div>`).join('')}</div></div></div>`;
-    root.querySelector('[data-v206-modal-close]').onclick = () => { root.innerHTML = ''; };
-    if (typeof hydrateIcons === 'function') hydrateIcons(root);
+    return openV206FrontAssetDetails(rep);
   }
 
   function enhanceTelecomTree() {
@@ -438,37 +428,324 @@
     catch (_) { try { return (await idbGet('assetPhotos',assetId))?.blob || null; } catch(__) { return null; } }
   }
 
+  const V301_FRONT_HIDDEN_KEYS=new Set([
+    'source_row','monthly_status','aliases','reviewed_on','linked_repeater_external_key',
+    'physical_units','rent_value','rent_expiry','land_contract_type','land_contract_expiry',
+    'land_expiry','land_status','land_dup','cpf','document','documento','landlord','owner',
+    'proprietario','proprietário','locador','arrendador'
+  ]);
+  const V301_FRONT_LABELS={
+    status:'Status',region:'Região',substation_code:'Subestação',feeder:'Alimentador',
+    location_name:'Localização',manufacturer:'Fabricante',model:'Modelo',serial_number:'Número de série',
+    'data.city':'Cidade','data.cps':'CPS','data.address':'Endereço','data.position':'Posição',
+    'data.network_voltage':'Tensão da rede','data.affected_customers':'Clientes afetados',
+    'data.switch_model':'Modelo da chave','data.switch_serial':'Nº de série da chave',
+    'data.switch_manufacture_year':'Ano de fabricação da chave','data.control_model':'Modelo do controle',
+    'data.control_serial':'Nº de série do controle','data.control_install_year':'Ano de instalação do controle',
+    'data.relay_firmware':'Firmware do relé','data.firmware':'Firmware','data.point_map':'Mapa de pontos',
+    'data.battery_specification':'Especificação da bateria','data.battery_spec':'Especificação da bateria',
+    'data.battery_last_change':'Última troca da bateria','data.battery_next_change':'Próxima troca da bateria',
+    'data.battery_type':'Tipo de bateria','data.battery_manufacturer':'Fabricante da bateria',
+    'data.battery_48v_banks':'Bancos de bateria 48 V','data.battery_autonomy':'Autonomia da bateria',
+    'data.communication_medium':'Meio de comunicação','data.communication_manufacturer':'Fabricante da comunicação',
+    'data.communication_technology':'Tecnologia de comunicação','data.communication_firmware':'Firmware da comunicação',
+    'data.communication_identifier':'IMEI / identificador','data.communication_type':'Tipo de comunicação',
+    'data.repeater_name':'Repetidora','data.radio_ip':'IP do rádio','data.relay_ip':'IP do relé',
+    'data.sim1_operator':'Operadora chip 1','data.sim1_iccid':'ICCID chip 1',
+    'data.sim2_operator':'Operadora chip 2','data.sim2_iccid':'ICCID chip 2','data.chip_legacy':'Identificador legado',
+    'data.structure_type':'Tipo de estrutura','data.structure_manufacturer':'Fabricante da estrutura',
+    'data.structure_height_m':'Altura da estrutura','data.aev_tower':'AEV da torre','data.aev_installed':'AEV instalada',
+    'data.installation_year':'Ano de instalação','data.shelter_type':'Tipo de abrigo','data.grounding':'Aterramento',
+    'data.access_4x2':'Acesso 4x2','data.access_trail':'Acesso por trilha','data.road_dry':'Condição de acesso no seco',
+    'data.road_rain':'Condição de acesso na chuva','data.night_service':'Atendimento noturno',
+    'data.site_key_type':'Tipo de chave do site','data.fence_type':'Tipo de cercamento',
+    'data.primary_comm_medium':'Meio de comunicação principal','data.primary_network_type':'Rede principal',
+    'data.redundant_comm_medium':'Meio redundante','data.xps_model':'Modelo XPS','data.xps_ip':'IP XPS',
+    'data.xps_protocol':'Protocolo XPS','data.xps_sit_management':'Gerenciamento XPS/SIT',
+    'data.automated':'Automatizado','data.power':'Potência','data.reference_voltage':'Tensão de referência',
+    'data.tp_ratio':'Relação TP','data.cell_quantity':'Quantidade de células','data.electrical_condition':'Condição elétrica'
+  };
+
+  function v301FrontFieldLabel(path){
+    if(V301_FRONT_LABELS[path])return V301_FRONT_LABELS[path];
+    return safe(path).replace(/^data\./,'').replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
+  }
+  function v301FrontFieldValue(asset,path){
+    if(path.startsWith('data.')){
+      let value=asset?.data;
+      for(const part of path.slice(5).split('.')){
+        if(value==null)return null;
+        value=value[part];
+      }
+      return value;
+    }
+    return asset?.[path];
+  }
+  function v301FrontScalarPaths(obj,prefix='data',out=[]){
+    if(!obj||typeof obj!=='object'||Array.isArray(obj))return out;
+    for(const [key,value] of Object.entries(obj)){
+      if(V301_FRONT_HIDDEN_KEYS.has(key)||/_external_key$/i.test(key)||/(^|_)(cpf|documento|document|owner|landlord|proprietario|locador|arrendador|telefone|phone|email|contato|contact)(_|$)/i.test(key))continue;
+      const path=`${prefix}.${key}`;
+      if(Array.isArray(value))continue;
+      if(value&&typeof value==='object')v301FrontScalarPaths(value,path,out);
+      else out.push(path);
+    }
+    return out;
+  }
+  function v301FrontEditablePaths(asset){
+    const top=['status','region','substation_code','feeder','location_name','manufacturer','model','serial_number'];
+    return [...new Set([...top,...v301FrontScalarPaths(asset?.data||{})])]
+      .filter(path=>v301FrontFieldValue(asset,path)!==undefined);
+  }
+  function v301FrontGroup(path){
+    const key=path.replace(/^data\./,'').toLowerCase();
+    if(key==='status')return'identification';
+    if(/communication|comm_|radio|relay_ip|sim\d|iccid|chip|operator|operadora|repeater|primary_network|redundant|xps/.test(key))return'communication';
+    if(/region|substation|feeder|location|city|cps|address|position|network_voltage|affected_customer|access|road_|trail|night_service|site_key|fence/.test(key))return'operational';
+    return'technical';
+  }
+  function v301FrontGroups(asset){
+    const groups={identification:[],operational:[],technical:[],communication:[]};
+    groups.identification.push(['Código operativo',asset.operating_code||asset.display_name||'',null]);
+    groups.identification.push(['Família',familyLabel(asset.family_code),null]);
+    for(const path of v301FrontEditablePaths(asset)){
+      const value=v301FrontFieldValue(asset,path);
+      const row=[v301FrontFieldLabel(path),value,path];
+      groups[v301FrontGroup(path)].push(row);
+    }
+    return groups;
+  }
+  function v301FrontInputValue(value){
+    if(value===null||value===undefined)return'';
+    if(typeof value==='boolean')return value?'Sim':'Não';
+    return String(value);
+  }
+  function v301FrontSectionMarkup(title,rows){
+    if(!rows.length)return'';
+    return `<section class="v301-front-section"><h3>${escapeHtml(title)}</h3><div class="v301-front-grid">${rows.map(([label,value,path])=>`<div class="v301-front-field"><label>${escapeHtml(label)}</label>${path?`<input data-v301-front-path="${escapeHtml(path)}" readonly value="${escapeHtml(v301FrontInputValue(value))}">`:`<input readonly tabindex="-1" value="${escapeHtml(v301FrontInputValue(value))}">`}</div>`).join('')}</div></section>`;
+  }
+  function v301FrontSnapshot(form){
+    const result={};
+    form?.querySelectorAll('[data-v301-front-path]').forEach(input=>{
+      result[input.dataset.v301FrontPath]=String(input.value??'').trim();
+    });
+    return result;
+  }
+  function v301FrontChanged(current,initial){
+    return Object.keys(current).some(key=>String(current[key]??'')!==String(initial[key]??''));
+  }
+  async function v301LoadFrontAudits(assetId){
+    if(state.role!=='admin'||!navigator.onLine||!cloudClient)return[];
+    try{
+      const {data,error}=await cloudClient.from('asset_audit_logs')
+        .select('id,action,changes,batch_id,created_at,actor_id')
+        .eq('asset_id',assetId)
+        .order('created_at',{ascending:false})
+        .limit(40);
+      if(error)throw error;
+      const names=new Map((state.profileDirectory||[]).map(profile=>[profile.id,profile.display_name]));
+      return (data||[]).map(row=>({...row,actor_name:names.get(row.actor_id)||'Administrativo'}));
+    }catch(error){
+      console.warn('Auditoria de front_assets:',error?.message||error);
+      return[];
+    }
+  }
+  function v301FrontAuditMarkup(audits){
+    if(!audits.length)return'<div class="empty">Nenhuma alteração cadastral registrada.</div>';
+    return audits.map(a=>`<article class="asset-audit-entry"><strong>${a.action==='bulk_update'?'Atualização por planilha':a.action==='batch_revert'?'Reversão de lote':'Edição administrativa'}</strong><small>${escapeHtml(typeof formatDate==='function'?formatDate(a.created_at):String(a.created_at||''))} · ${escapeHtml(new Date(a.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))} · ${escapeHtml(a.actor_name||'Administrativo')}</small><div class="asset-audit-changes">${(a.changes||[]).map(change=>`<span class="asset-audit-change"><b>${escapeHtml(change.label||v301FrontFieldLabel(change.field||change.field_path||''))}</b>: ${escapeHtml(change.before??change.old_value??'—')} → ${escapeHtml(change.after??change.new_value??'—')}</span>`).join('')}</div></article>`).join('');
+  }
+
   async function v206ChooseFrontAssetPhoto(asset, imgHost) {
-    const input = document.createElement('input');
-    input.type='file'; input.accept='image/*'; input.capture='environment';
-    input.onchange = async () => {
-      const file=input.files?.[0]; if(!file)return;
-      try {
-        const blob = typeof compressImage === 'function' ? await compressImage(file,1000,.82) : file;
-        await idbPut('assetPhotos',{assetId:asset.id,blob,updatedAt:new Date().toISOString(),frontAsset:true});
-        imgHost.innerHTML=`<img src="${blobUrl(blob)}" alt="Foto do ativo"><span class="v206-photo-hover">Alterar foto</span>`;
-        imgHost.classList.add('has-photo');
-      } catch(error) { if(typeof toast==='function')toast(error.message||String(error),'warning'); }
-    };
-    input.click();
+    try{
+      let source=null;
+      if(globalThis.CentralMedia?.pickImage){
+        source=await globalThis.CentralMedia.pickImage({
+          title:'Foto principal do ativo',
+          context:{kind:'front-asset-profile',assetId:asset.id}
+        });
+      }else{
+        source=await new Promise(resolve=>{
+          const input=document.createElement('input');
+          input.type='file';
+          input.accept='image/*';
+          input.onchange=()=>resolve(input.files?.[0]||null);
+          input.click();
+        });
+      }
+      if(!source)return;
+      const nativeAndroid=(()=>{
+        try{return globalThis.CentralNativeAndroid?.isAvailable?.()===true}
+        catch(_){return false}
+      })();
+      const blob=nativeAndroid?source:(typeof compressImage==='function'?await compressImage(source,1000,.82):source);
+      await idbPut('assetPhotos',{assetId:asset.id,blob,updatedAt:new Date().toISOString(),frontAsset:true});
+      imgHost.innerHTML=`<img src="${blobUrl(blob)}" alt="Foto do ativo"><span class="v206-photo-hover">Alterar foto</span>`;
+      imgHost.classList.add('has-photo');
+      if(typeof toast==='function')toast('Foto principal atualizada.');
+    }catch(error){
+      const message=String(error?.message||error);
+      if(!/cancel|cancelado|canceled/i.test(message)&&typeof toast==='function')toast(message,'warning');
+    }
+  }
+
+  async function v301RefreshFrontAsset(asset){
+    if(!navigator.onLine||!cloudClient)return asset;
+    try{
+      const {data,error}=await cloudClient.from('front_assets').select('*').eq('id',asset.id).single();
+      if(error)throw error;
+      if(data){
+        Object.assign(asset,data,{row_version:Number(data.row_version||1),data:data.data||{},data_state:data.data_state||{}});
+        state.frontAssetMap?.set?.(asset.id,asset);
+        const index=(state.frontAssets||[]).findIndex(item=>item.id===asset.id);
+        if(index>=0)state.frontAssets[index]=asset;
+      }
+    }catch(error){
+      console.warn('Atualização do ativo após edição:',error?.message||error);
+    }
+    return asset;
   }
 
   async function openV206FrontAssetDetails(asset) {
-    if (!asset) return;
-    const root=document.getElementById('modal-root'); if(!root)return;
-    const photo=await v206LocalAssetPhoto(asset.id), rows=v206FrontDetailRows(asset), history=frontHistoryRows(asset).slice(0,12);
-    const canRoute=asset.family_code==='distribution_recloser'&&asset.latitude!=null&&asset.longitude!=null;
-    root.innerHTML=`<div class="modal" id="v206-front-asset-modal"><div class="modal-card report-modal-card v206-front-detail-card">
+    if(!asset)return;
+    const root=document.getElementById('modal-root');
+    if(!root)return;
+
+    const [photo,audits]=await Promise.all([
+      v206LocalAssetPhoto(asset.id),
+      v301LoadFrontAudits(asset.id)
+    ]);
+    const history=frontHistoryRows(asset).slice(0,12);
+    const groups=v301FrontGroups(asset);
+    const admin=state.role==='admin';
+    const canRoute=asset.latitude!=null&&asset.longitude!=null;
+
+    root.innerHTML=`<div class="modal" id="v206-front-asset-modal"><div class="modal-card report-modal-card v206-front-detail-card v301-front-detail-card">
       <button class="modal-close" id="v206-close-front-detail" type="button" aria-label="Fechar"><span data-icon="x"></span></button>
-      <div class="report-header v206-front-detail-header"><div><span class="status-pill imported">${escapeHtml(familyLabel(asset.family_code))}</span><h2>${escapeHtml(assetTitle(asset))}</h2><p class="muted">${escapeHtml([asset.substation_code,asset.location_name].filter(Boolean).join(' — '))}</p></div>${canRoute?'<button class="btn primary v206-route-action" id="v206-detail-route" type="button"><span data-icon="arrow-right"></span>Traçar rota</button>':''}</div>
-      <div class="asset-modal-profile v206-front-profile"><button type="button" class="asset-modal-photo v206-front-photo ${photo?'has-photo':''}" id="v206-front-photo">${photo?`<img src="${blobUrl(photo)}" alt="Foto do ativo"><span class="v206-photo-hover">Alterar foto</span>`:'<span data-icon="settings"></span><small>Adicionar foto do ativo</small>'}</button><div class="asset-edit-form"><div class="asset-edit-grid">${rows.map(([label,value])=>`<div class="asset-edit-field"><label>${escapeHtml(label)}</label><input readonly value="${escapeHtml(detailValue(value))}"></div>`).join('')}</div><div class="asset-version-note">Revisão cadastral ${Number(asset.row_version||1)} · ID interno ${escapeHtml(asset.id)}</div></div></div>
+      <div class="report-header v206-front-detail-header">
+        <div>
+          <span class="status-pill imported">${escapeHtml(familyLabel(asset.family_code))}</span>
+          <h2>${escapeHtml(assetTitle(asset))}</h2>
+          <p class="muted">${escapeHtml([asset.substation_code,asset.location_name].filter(Boolean).join(' — '))}</p>
+        </div>
+        ${admin?'<div class="asset-detail-header-actions"><button class="asset-lock-button" id="v301-front-edit-lock" type="button" title="Desbloquear edição" aria-label="Desbloquear edição"><span data-icon="lock"></span></button></div>':''}
+      </div>
+
+      <div class="v301-front-detail-layout">
+        <aside class="v301-front-detail-aside">
+          <button type="button" class="asset-modal-photo v206-front-photo ${photo?'has-photo':''}" id="v206-front-photo">
+            ${photo?`<img src="${blobUrl(photo)}" alt="Foto do ativo"><span class="v206-photo-hover">Alterar foto</span>`:'<span data-icon="settings"></span><small>Adicionar foto do ativo</small>'}
+          </button>
+          ${canRoute?'<button class="btn primary v301-front-route" id="v206-detail-route" type="button"><span data-icon="arrow-right"></span>Traçar rota</button>':''}
+        </aside>
+
+        <form id="v301-front-edit-form" class="v301-front-detail-content">
+          ${v301FrontSectionMarkup('Identificação',groups.identification)}
+          ${v301FrontSectionMarkup('Operacional e localização',groups.operational)}
+          ${v301FrontSectionMarkup('Detalhes técnicos',groups.technical)}
+          ${v301FrontSectionMarkup('Comunicação',groups.communication)}
+          <div class="asset-version-note">Revisão cadastral ${Number(asset.row_version||1)} · ID interno ${escapeHtml(asset.id)}</div>
+          <div class="asset-edit-actions hidden" id="v301-front-edit-actions">
+            <button class="btn secondary" id="v301-front-edit-cancel" type="button">Cancelar</button>
+            <button class="btn primary" id="v301-front-edit-save" type="submit">Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+
       <div class="detail-block"><h3>Histórico relacionado</h3>${history.length?`<div class="history">${history.map(row=>{const summary=row.summary||row.payload?.['Descreva a atividade executada, o diagnóstico identificado e o que ficou pendente.']||'';return `<article class="history-card"><div class="date">${escapeHtml(typeof formatDate==='function'?formatDate(row.occurred_on):row.occurred_on)} · ${escapeHtml(row.work_order||'Sem OS')}</div><h4>${escapeHtml(row.maintenance_type||'Atendimento')}</h4>${row.team?`<p><b>Equipe:</b> ${escapeHtml(row.team)}</p>`:''}${summary?`<p>${escapeHtml(summary)}</p>`:''}</article>`}).join('')}</div>`:'<div class="empty">Nenhum histórico relacionado localizado automaticamente.</div>'}</div>
+
+      ${admin?`<div class="detail-block"><h3>Alterações cadastrais</h3><div class="asset-audit-list">${v301FrontAuditMarkup(audits)}</div></div>`:''}
     </div></div>`;
-    const close=()=>{root.innerHTML=''};
+
+    const modal=root.querySelector('#v206-front-asset-modal');
+    const form=root.querySelector('#v301-front-edit-form');
+    const lock=root.querySelector('#v301-front-edit-lock');
+    const actions=root.querySelector('#v301-front-edit-actions');
+    const photoHost=root.querySelector('#v206-front-photo');
+    let editing=false;
+    let initial=v301FrontSnapshot(form);
+
+    const setEditing=value=>{
+      editing=value;
+      form.classList.toggle('editing',editing);
+      actions?.classList.toggle('hidden',!editing);
+      form.querySelectorAll('[data-v301-front-path]').forEach(input=>{input.readOnly=!editing});
+      if(lock){
+        lock.classList.toggle('unlocked',editing);
+        if(typeof setIconOnly==='function')setIconOnly(lock,editing?'lock-open':'lock');
+        else lock.innerHTML=`<span data-icon="${editing?'lock-open':'lock'}"></span>`;
+        lock.title=editing?'Bloquear sem salvar':'Desbloquear edição';
+        lock.setAttribute('aria-label',lock.title);
+      }
+    };
+
+    const close=()=>{
+      if(editing&&v301FrontChanged(v301FrontSnapshot(form),initial)&&!confirm('Descartar as alterações não salvas?'))return;
+      root.innerHTML='';
+    };
+
     root.querySelector('#v206-close-front-detail').onclick=close;
-    root.querySelector('#v206-front-asset-modal').onclick=e=>{if(e.target===e.currentTarget)close()};
+    modal.onclick=event=>{if(event.target===modal)close()};
     root.querySelector('#v206-detail-route')?.addEventListener('click',()=>v206RouteToAsset(asset));
-    const photoHost=root.querySelector('#v206-front-photo'); photoHost?.addEventListener('click',()=>v206ChooseFrontAssetPhoto(asset,photoHost));
+    photoHost?.addEventListener('click',()=>v206ChooseFrontAssetPhoto(asset,photoHost));
+
+    lock?.addEventListener('click',()=>{
+      if(!navigator.onLine)return toast('A edição cadastral exige conexão com a nuvem.','warning');
+      if(editing&&v301FrontChanged(v301FrontSnapshot(form),initial)){
+        if(!confirm('Descartar as alterações feitas?'))return;
+        for(const [path,value] of Object.entries(initial)){
+          const input=[...form.querySelectorAll('[data-v301-front-path]')].find(item=>item.dataset.v301FrontPath===path);
+          if(input)input.value=value;
+        }
+      }
+      setEditing(!editing);
+    });
+
+    root.querySelector('#v301-front-edit-cancel')?.addEventListener('click',()=>{
+      for(const [path,value] of Object.entries(initial)){
+        const input=[...form.querySelectorAll('[data-v301-front-path]')].find(item=>item.dataset.v301FrontPath===path);
+        if(input)input.value=value;
+      }
+      setEditing(false);
+    });
+
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      if(!editing)return;
+      if(!navigator.onLine)return toast('A edição cadastral exige conexão com a nuvem.','warning');
+
+      const current=v301FrontSnapshot(form);
+      const updates={};
+      for(const [path,value] of Object.entries(current)){
+        const before=String(initial[path]??'');
+        if(value!==before)updates[path]=value===''?null:value;
+      }
+      if(!Object.keys(updates).length){
+        toast('Nenhuma alteração foi identificada.','notice');
+        return setEditing(false);
+      }
+
+      const save=root.querySelector('#v301-front-edit-save');
+      save.disabled=true;
+      save.textContent='Salvando…';
+      try{
+        const {error}=await cloudClient.rpc('update_front_asset_record',{
+          p_asset_id:asset.id,
+          p_expected_version:Number(asset.row_version||1),
+          p_updates:updates
+        });
+        if(error)throw error;
+        await v301RefreshFrontAsset(asset);
+        toast('Cadastro do ativo atualizado.');
+        await openV206FrontAssetDetails(asset);
+      }catch(error){
+        save.disabled=false;
+        save.textContent='Salvar alterações';
+        const message=String(error?.message||error);
+        toast(/version|versão|conflict|conflito/i.test(message)?'O cadastro mudou desde que esta ficha foi aberta. Feche a ficha, abra novamente e revise os dados.':message,'warning');
+      }
+    };
+
+    setEditing(false);
     if(typeof hydrateIcons==='function')hydrateIcons(root);
   }
 

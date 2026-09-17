@@ -1,4 +1,4 @@
-const SW_VERSION = '3.0.0-media-v10.0';
+const SW_VERSION = '3.0.1-media-v10.1';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
