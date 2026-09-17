@@ -65,7 +65,9 @@ const v206Source = join(repoRoot, 'assets', 'js', 'v206.js');
 const v206CssSource = join(repoRoot, 'assets', 'css', 'v206.css');
 const v207Source = join(repoRoot, 'assets', 'js', 'v207.js');
 const v207CssSource = join(repoRoot, 'assets', 'css', 'v207.css');
-for (const source of [v205PrebootSource, v205Source, v205CssSource, v206Source, v206CssSource, v207Source, v207CssSource]) {
+const v208Source = join(repoRoot, 'assets', 'js', 'v208.js');
+const v208CssSource = join(repoRoot, 'assets', 'css', 'v208.css');
+for (const source of [v205PrebootSource, v205Source, v205CssSource, v206Source, v206CssSource, v207Source, v207CssSource, v208Source, v208CssSource]) {
   if (!existsSync(source)) throw new Error(`Arquivo de camada funcional obrigatório não encontrado: ${source}`);
 }
 const v205PrebootText = readFileSync(v205PrebootSource, 'utf8');
@@ -75,13 +77,17 @@ const v206Text = readFileSync(v206Source, 'utf8');
 const v206CssText = readFileSync(v206CssSource, 'utf8');
 const v207Text = readFileSync(v207Source, 'utf8');
 const v207CssText = readFileSync(v207CssSource, 'utf8');
+const v208Text = readFileSync(v208Source, 'utf8');
+const v208CssText = readFileSync(v208CssSource, 'utf8');
 if (!v205Text.includes("const V205_VERSION='2.0.6'")) throw new Error('v205.js base esperada: 2.0.6.');
 if (!v206Text.includes("const V206_VERSION = '2.0.6'")) throw new Error('v206.js base esperada: 2.0.6.');
 if (!v207Text.includes("const V207_VERSION = '2.0.7'")) throw new Error('v207.js não identifica a versão 2.0.7.');
+if (!v208Text.includes("const V208_VERSION = '2.0.8'")) throw new Error('v208.js não identifica a versão 2.0.8.');
 new Function(v205PrebootText);
 new Function(v205Text);
 new Function(v206Text);
 new Function(v207Text);
+new Function(v208Text);
 
 const nativeBridgeSource = join(mobileDir, 'native', 'native-bridge.js');
 if (!existsSync(nativeBridgeSource)) throw new Error(`Bridge nativa não encontrada: ${nativeBridgeSource}`);
@@ -115,6 +121,8 @@ const buildToken = createHash('sha256')
   .update(v206CssText)
   .update(v207Text)
   .update(v207CssText)
+  .update(v208Text)
+  .update(v208CssText)
   .update(nativeBridgeText)
   .digest('hex')
   .slice(0, 12);
@@ -145,6 +153,7 @@ const appTag = '<script src="./app.js"></script>';
 const v205Tag = '<script src="./assets/js/v205.js"></script>';
 const v206Tag = '<script src="./assets/js/v206.js"></script>';
 const v207Tag = '<script src="./assets/js/v207.js"></script>';
+const v208Tag = '<script src="./assets/js/v208.js"></script>';
 const mediaCoreTag = '<script src="./assets/js/media-core.js"></script>';
 const mobileCssTag = '<link rel="stylesheet" href="./mobile-overrides.css">';
 
@@ -154,6 +163,7 @@ html = html
   .replace(v205Tag, '')
   .replace(v206Tag, '')
   .replace(v207Tag, '')
+  .replace(v208Tag, '')
   .replace(mediaCoreTag, '')
   .replace('<script src="./mobile-native.js"></script>', '');
 
@@ -169,6 +179,7 @@ const nativeScripts = [
   v205Tag,
   v206Tag,
   v207Tag,
+  v208Tag,
   `<script src="./assets/js/${nativeMediaName}"></script>`,
 ].join('\n');
 
@@ -178,10 +189,11 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
-  appVersion: '2.0.7',
+  appVersion: '2.0.8',
   v205: 'enabled',
   v206: 'enabled',
   v207: 'enabled',
+  v208: 'enabled',
   mediaCore: '4.1.0',
   nativeBridge: '5.0.0',
   serviceWorker: 'disabled-in-native',

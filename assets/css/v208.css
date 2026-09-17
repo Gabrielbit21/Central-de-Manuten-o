@@ -1,0 +1,147 @@
+/* Central de Manutenção SE — v2.0.8
+   Escopo: somente formulários de Nova Manutenção de Distribuição/Telecom. */
+
+/* Foto principal: usa a mesma caixa/overlay visual dos ativos de Subestação. */
+.v206-asset-summary-card .v208-front-profile-frame{
+  width:112px;
+  height:112px;
+  align-self:start;
+  overflow:hidden;
+}
+.v206-asset-summary-card .v208-front-profile-frame img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.v206-asset-summary-card .v208-front-profile-frame .asset-profile-action{
+  opacity:1;
+  display:grid;
+  place-items:center;
+  text-align:center;
+}
+.v206-asset-summary-card .v208-front-profile-frame.has-photo .asset-profile-action{
+  opacity:0;
+}
+.v206-asset-summary-card .v208-front-profile-frame.has-photo:hover .asset-profile-action,
+.v206-asset-summary-card .v208-front-profile-frame.has-photo:focus-within .asset-profile-action{
+  opacity:1;
+}
+.v206-asset-summary-card .v208-front-profile-frame .asset-profile-placeholder{
+  min-height:100%;
+}
+
+/* Remove qualquer sobra visual do seletor de equipe paralelo da 2.0.7. */
+#v205-form .v207-team-control{display:none!important}
+
+/* O componente real passa a ser o mesmo .v200-team-box da Subestação. */
+#v205-form .v200-team-field{
+  grid-column:1/-1;
+}
+#v205-form .v200-team-box{
+  width:100%;
+}
+
+/* Imagens da manutenção: mesma linguagem do upload-zone/photo-grid padrão. */
+#v205-form .v208-standard-photo-section{
+  padding-top:20px;
+  border-top:1px solid var(--line);
+}
+#v205-form .v208-standard-photo-section > .v205-section-title{
+  display:none;
+}
+#v205-form .v208-photo-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:13px;
+}
+#v205-form .v208-photo-heading h3{
+  margin:0;
+  color:var(--ink);
+  font-size:18px;
+}
+#v205-form .v208-photo-heading span{
+  font-size:11px;
+}
+#v205-form .v208-standard-photo-section > .field.full{
+  grid-column:1/-1;
+}
+#v205-form .upload-zone{
+  width:100%;
+}
+#v205-form .photo-grid{
+  width:100%;
+}
+
+/* Encerramento: elimina a "caixa dentro da caixa" da camada multi-frente. */
+#v205-form .v208-required-note{
+  margin:4px 0 2px;
+}
+#v205-form .v205-form-actions.v208-standard-actions{
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  border-radius:0;
+  padding:8px 0 0;
+  margin-top:0;
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  align-items:center;
+}
+#v205-form .v205-form-actions.v208-standard-actions .btn{
+  min-height:44px;
+}
+
+/* Escolha da origem da foto principal. */
+.v208-profile-source-card{
+  max-width:470px;
+}
+.v208-profile-source-card h2{
+  margin:0 0 6px;
+}
+.v208-profile-source-card .muted{
+  margin:0 0 18px;
+}
+.v208-profile-source-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.v208-profile-source-actions .btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+
+/* O perfil do ativo não precisa do espaçamento extra criado pelos
+   botões soltos "Tirar foto / Galeria" da v2.0.7. */
+.v206-asset-summary-card{
+  margin-bottom:18px;
+}
+
+@media(max-width:760px){
+  .v206-asset-summary-card .v208-front-profile-frame{
+    width:112px;
+    height:112px;
+  }
+  #v205-form .v208-photo-heading{
+    display:block;
+  }
+  #v205-form .v208-photo-heading span{
+    display:block;
+    margin-top:4px;
+  }
+  #v205-form .v205-form-actions.v208-standard-actions{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  #v205-form .v205-form-actions.v208-standard-actions .btn{
+    width:100%;
+  }
+  .v208-profile-source-actions{
+    grid-template-columns:1fr;
+  }
+}
