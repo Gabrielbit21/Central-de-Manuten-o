@@ -198,7 +198,9 @@
     const continueButton = document.getElementById('continue');
     if (!search || !continueButton) return;
 
-    renderCommunicationGroup(search.value);
+    if (!document.querySelector('.v209-communication-group')) {
+  renderCommunicationGroup(search.value);
+}
 
     if (search.dataset.v209CommSearch !== '1') {
       search.dataset.v209CommSearch = '1';
