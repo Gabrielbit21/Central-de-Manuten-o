@@ -207,12 +207,68 @@
     'data.battery_manufacturer':{label:'Fabricante da bateria'},'data.xps_ip':{label:'IP do retificador/XPS',mask:'ipv4'},'data.xps_model':{label:'Modelo do retificador/XPS'},
     'data.city':{label:'Cidade'},'data.site_key_type':{label:'Tipo de chave de acesso'},'data.road_dry':{label:'Acesso em tempo seco'},'data.road_rain':{label:'Acesso com chuva'},'data.night_service':{label:'Atendimento noturno'}
   };
+  Object.assign(FIELD_META,{
+    'data.switch_manufacture_year':{label:'Ano de fabricação da chave'},
+    'data.control_install_year':{label:'Ano de instalação do controle'},
+    'data.network_voltage':{label:'Tensão da rede'},
+    'data.reviewed_on':{label:'Data da última revisão da base'},
+    'data.linked_repeater_external_key':{label:'Identificador interno da repetidora'},
+    'data.regulator_name':{label:'Identificação do regulador'},
+    'data.automated':{label:'Automatizado'},
+    'data.power':{label:'Potência'},
+    'data.reference_voltage':{label:'Tensão de referência'},
+    'data.tp_ratio':{label:'Relação TP'},
+    'data.cell_quantity':{label:'Quantidade de células'},
+    'data.legacy_chip':{label:'Identificador legado do chip'},
+    'data.unit':{label:'Unidade'},
+    'data.cps':{label:'CPS'},
+    'data.ownership':{label:'Propriedade'},
+    'data.shelter_type':{label:'Tipo de abrigo'},
+    'data.tower_technologies':{label:'Tecnologias instaladas na torre'},
+    'data.primary_comm_medium':{label:'Meio de comunicação principal'},
+    'data.primary_network_type':{label:'Rede principal'},
+    'data.redundant_comm_medium':{label:'Meio de comunicação redundante'},
+    'data.observations':{label:'Observações'},
+    'data.improvement_need':{label:'Necessidade de melhoria'},
+    'data.grounding':{label:'Aterramento'},
+    'data.utility_installation':{label:'Instalação da concessionária'},
+    'data.utility_feeder':{label:'Alimentador da concessionária'},
+    'data.utility_switch':{label:'Chave da concessionária'},
+    'data.access_4x2':{label:'Acesso com veículo 4x2'},
+    'data.access_trail':{label:'Acesso por trilha'},
+    'data.fence_type':{label:'Tipo de fechamento do terreno'},
+    'data.ac_capacity':{label:'Capacidade do ar-condicionado'},
+    'data.ac_type':{label:'Tipo de ar-condicionado'},
+    'data.ac_quantity':{label:'Quantidade de aparelhos de ar-condicionado'},
+    'data.ac_status':{label:'Situação do ar-condicionado'},
+    'data.ac_brand':{label:'Marca do ar-condicionado'},
+    'data.ac_model':{label:'Modelo do ar-condicionado'},
+    'data.ac_serial':{label:'Número de série do ar-condicionado'},
+    'data.camera_bullet_quantity':{label:'Quantidade de câmeras bullet'},
+    'data.camera_bullet_model':{label:'Modelo da câmera bullet'},
+    'data.camera_speed_dome_tower_height':{label:'Altura da câmera Speed Dome'},
+    'data.camera_speed_dome_location':{label:'Localização da câmera Speed Dome'},
+    'data.camera_speed_dome_quantity':{label:'Quantidade de câmeras Speed Dome'},
+    'data.xps_protocol':{label:'Protocolo do retificador/XPS'},
+    'data.xps_sit_management':{label:'Gerenciamento do XPS no SIT'},
+    'data.electrical_condition':{label:'Condição da instalação elétrica'},
+    'data.battery_next_change':{label:'Próxima troca das baterias'},
+    'data.battery_autonomy':{label:'Autonomia das baterias'},
+    'data.vegetation_priority':{label:'Prioridade de limpeza de vegetação'},
+    'data.vegetation_cleanings_year':{label:'Limpezas de vegetação por ano'},
+    'data.electrical_planned_date':{label:'Data prevista para adequação elétrica'}
+  });
+  const V209_HIDDEN_CADASTRAL_KEYS=new Set([
+    'source_row','monthly_status','aliases','reviewed_on','linked_repeater_external_key',
+    'rent_value','rent_expiry','land_contract_type','land_contract_expiry','land_expiry',
+    'land_status','land_dup','physical_units'
+  ]);
   function fieldMeta(path){return FIELD_META[path]||{label:prettyKey(path)}}
   function flattenEditableData(obj,prefix='data',out=[]){
     if(!obj||typeof obj!=='object')return out;
     for(const [k,v] of Object.entries(obj)){
       const p=`${prefix}.${k}`;
-      if(['source_row','monthly_status','aliases','rent_value','rent_expiry','land_contract_expiry'].includes(k))continue;
+      if(V209_HIDDEN_CADASTRAL_KEYS.has(k)||/_external_key$/i.test(k))continue;
       if(Array.isArray(v)){continue}
       if(v&&typeof v==='object')flattenEditableData(v,p,out);else out.push(p);
     }
@@ -274,19 +330,77 @@
   )}
   function telecomClosingMarkup(){return section('Encerramento',selectField('activityStatus','Situação da atividade',['Concluído','Pendente'],{required:true})+dynamicBlock('v205-pendency',textArea('activityPending','Qual foi a pendência da atividade?',{required:true})))}
   function operatorSelect(name,label,required=false,value=''){return selectField(name,label,[...OPERATORS,'Não há operadora redundante'],{required,value})}
-  function batteryOptionsPreventive(){return ['12V 7Ah','12V 12Ah','12V 18Ah','12V 24Ah']}
+  function batteryOptionsPreventive(){return ['12V 7Ah','12V 12Ah','12V 18Ah','12V 24Ah','12V 26Ah']}
   function batteryOptionsCorrective(){return ['12V 18Ah','12V 7Ah','12V 26Ah','12V 12Ah']}
   function lithiumOptions(){return ['12V 10Ah','24V 10Ah','12V 30Ah']}
+
+  function v209RelayCommunicationMedium(d={}){
+    const medium=norm(d.communication_medium),manufacturer=norm(d.communication_manufacturer),technology=norm(d.communication_technology);
+    if(medium.includes('radio'))return 'Rádio';
+    if(medium.includes('fibra'))return 'Fibra Óptica';
+    if(medium.includes('modem')||medium.includes('gprs')){
+      if(manufacturer.includes('romagnole'))return 'Modem (Romagnole)';
+      if(manufacturer.includes('lupa'))return 'Modem (Lupa)';
+      return 'Modem (Lupa)';
+    }
+    if(medium.includes('orbcomm'))return d.sim2_operator?'ORBCOMM com redundância GPRS':'ORBCOMM';
+    if(medium.includes('satelital')){
+      if(manufacturer.includes('gilat')||manufacturer.includes('skyedge')||technology.includes('ku'))return 'Skyedge';
+      if(manufacturer.includes('orbcomm')||technology.includes('banda l'))return d.sim2_operator?'ORBCOMM com redundância GPRS':'ORBCOMM';
+    }
+    return '';
+  }
+  function v209CommissioningMedium(d={}){
+    const medium=v209RelayCommunicationMedium(d);
+    if(medium.startsWith('Modem'))return '4G/3G';
+    return medium;
+  }
+  function v209RadioModel(d={}){
+    const manufacturer=norm(d.communication_manufacturer);
+    if(manufacturer.includes('ge mds'))return 'GE MDS';
+    if(manufacturer.includes('ge orbit'))return 'GE ORBIT';
+    if(manufacturer.includes('apri')||manufacturer.includes('aviat'))return 'Aprisa 4RF/Aviat';
+    return '';
+  }
+  function v209BatteryProfile(spec=''){
+    const text=String(spec||'').trim(),n=norm(text);
+    if(!text||text==='-'||text==='?')return {type:'',capacity:''};
+    const type=n.includes('litio')?'Lítio':'Chumbo Ácida';
+    const m=text.match(/(\d+)\s*V\s*(\d+)\s*Ah/i);
+    return {type,capacity:m?`${m[1]}V ${m[2]}Ah`:''};
+  }
+  function v209RepeaterBatteryType(value=''){
+    const n=norm(value);
+    if(n.includes('litio'))return 'Lítio';
+    if(n.includes('chumbo'))return 'Chumbo Ácido';
+    return '';
+  }
+  function v209RepeaterStructureType(value=''){
+    const n=norm(value);
+    if(n.includes('autoport'))return 'Torre Autoportante';
+    if(n.includes('estai'))return 'Torre Estaiada';
+    if(n.includes('duplo')||n.includes('duplo t'))return 'Poste Duplo T';
+    if(n.includes('circular'))return 'Poste Circular';
+    if(n.includes('poste'))return 'Poste Circular';
+    return value&&value!=='-'&&value!=='?'?'Outro':'';
+  }
+  function v209RepeaterStructureManufacturer(value=''){
+    const n=norm(value);
+    if(n.includes('flex'))return 'Flextower';
+    if(n.includes('engefame'))return 'Engefame';
+    if(n.includes('adaxa'))return 'Adaxa';
+    return value&&value!=='-'&&value!=='?'?'Outro':'';
+  }
 
   function preventiveRelayMarkup(asset){
     const d=asset.data||{};
     return section('Relé e acesso remoto',
       textField('relayFirmware','Firmware do relé',{required:true,value:cleanExisting(d.relay_firmware)})+
       yesNo('remoteAccess','Foi parametrizado acesso remoto?',true)+
-      selectField('communicationMedium','Meio de comunicação',['Rádio','ORBCOMM','ORBCOMM com redundância GPRS','Modem (Lupa)','Modem (Romagnole)','Fibra Óptica','Skyedge'],{required:true,full:true,value:''})
+      selectField('communicationMedium','Meio de comunicação',['Rádio','ORBCOMM','ORBCOMM com redundância GPRS','Modem (Lupa)','Modem (Romagnole)','Fibra Óptica','Skyedge'],{required:true,full:true,value:v209RelayCommunicationMedium(d)})
     )+
     dynamicBlock('v205-comm-radio',section('Comunicação por rádio',
-      selectField('radioModel','Modelo do rádio',['GE MDS','GE ORBIT','Aprisa 4RF/Aviat'],{required:true})+
+      selectField('radioModel','Modelo do rádio',['GE MDS','GE ORBIT','Aprisa 4RF/Aviat'],{required:true,value:v209RadioModel(d)})+
       textField('radioSignalSnr','Sinal recebido / SNR',{required:true,placeholder:'Ex.: -90dBm / SNR: 35dB'})+
       textField('radioIp','IP do rádio',{required:true,value:cleanExisting(d.radio_ip),mask:'ipv4',inputmode:'decimal'})+
       textField('communicationFirmware','Firmware de comunicação',{required:true,value:cleanExisting(d.communication_firmware),mask:'firmware3'})+
@@ -318,18 +432,18 @@
       yesNo('skyedgeCanUhf','É possível alterar a comunicação atual para rádio UHF?',true)+
       dynamicBlock('v205-skyedge-repeater',selectField('skyedgeRepeater','Qual repetidora?',repeaters().map(r=>r.display_name),{required:true,full:true}))
     ))+
-    section('Bateria',yesNo('batteryReplaced','A bateria foi substituída nesta preventiva?')+
-      dynamicBlock('v205-preventive-battery',selectField('batteryType','Tipo da bateria instalada',['Lítio','Chumbo Ácida'],{required:true})+
-        dynamicBlock('v205-battery-lithium',selectField('batteryCapacityLithium','Capacidade da bateria',lithiumOptions(),{required:true}))+
-        dynamicBlock('v205-battery-lead',selectField('batteryCapacityLead','Capacidade da bateria',batteryOptionsPreventive(),{required:true})))
-    );
+    (()=>{const battery=v209BatteryProfile(d.battery_specification||d.battery_spec);return section('Bateria',yesNo('batteryReplaced','A bateria foi substituída nesta preventiva?')+
+      dynamicBlock('v205-preventive-battery',selectField('batteryType','Tipo da bateria instalada',['Lítio','Chumbo Ácida'],{required:true,value:battery.type})+
+        dynamicBlock('v205-battery-lithium',selectField('batteryCapacityLithium','Capacidade da bateria',lithiumOptions(),{required:true,value:battery.type==='Lítio'?battery.capacity:''}))+
+        dynamicBlock('v205-battery-lead',selectField('batteryCapacityLead','Capacidade da bateria',batteryOptionsPreventive(),{required:true,value:battery.type==='Chumbo Ácida'?battery.capacity:''})))
+    )})();
   }
 
   const COMM_DEFECTS=['Problema no equipamento de comunicação (modem, rádio, orbcomm)','Problema nos periféricos do equipamento do meio de comunicação (antena, cabos)','Problema no chip (apenas se for GPRS)','Problema na ERB (apenas se for GPRS)','Problema na Alimentação do meio de comunicação'];
   const COMM_CAUSES=['Queima do Equipamento de Comunicação','Inseto no Equipamento de Comunicação','Problema interno no Equipamento de Comunicação','Extrapolação do pacote de dados, ocasionando bloqueio da porta de comunicação','Problema de conexão com o equipamento de comunicação','Piora no nível de sinal','Antena danificada','Antena inadequada (Modelo inadequado ou número de elementos insuficientes)','Cabos danificados ou mau contato','Centelhador','Conversor','Queima do chip 1 ou 2','Sem sinal da operadora atual','Chip não conecta','Chip queimado','Falta de Alimentação na ERB','Disjuntor desligado/desarmado','Problema na alimentação externa do relé','Problema com o Scada'];
   const HARDWARE_DEFECTS=['Problema na Bateria','Problema no Controle','Problema na Chave','Problema nos periféricos do religador (Cabos e outros)'];
   const HARDWARE_CAUSES=['Vida útil ultrapassada (desgaste)','Oxidação dos terminais','Bateria estufada','Descarga profunda','Sensor da bateria','Bateria em curto','Defeito em placas internas do controle (RIF, CPU, Fonte, Módulo SIM, DC1000, Toróide, RCM, ...)','Defeito no relé','Ajuste na parametrização do equipamento (atualização de firmware, calibração de tensão...)','Inseto no controle','Conversor','Umidade no controle','Defeito no pólo','Defeito em placas internas da chave (Atuador, SCEM, C100, ...)','Defeito na caixa de interface','Umidade na chave','Defeito nos sensores de tensão e corrente','Problema no Umbilical','Problema no DPS','Problema no disjuntor de CA/CC','Para raios','Aterramento','Conversores','Chicotes internos','Tensão alta na entrada do relé'];
-  function correctiveDistributionMarkup(){return section('Tipo de corretiva',checkGroup('correctiveType','Selecione o(s) tipo(s) de corretiva',['Corretiva de Comunicação','Corretiva de Hardware'],true))+
+  function correctiveDistributionMarkup(asset){const d=asset?.data||{},battery=v209BatteryProfile(d.battery_specification||d.battery_spec);return section('Tipo de corretiva',checkGroup('correctiveType','Selecione o(s) tipo(s) de corretiva',['Corretiva de Comunicação','Corretiva de Hardware'],true))+
     dynamicBlock('v205-corrective-communication',section('Corretiva de Comunicação',
       checkGroup('communicationDefect','Tipo de defeito',COMM_DEFECTS,true)+checkGroup('communicationCause','Causa do defeito',COMM_CAUSES,true)+
       dynamicBlock('v205-worse-signal',textField('worseSignalValue','Nível de sinal identificado',{required:true,placeholder:'Ex.: -98 dBm'}))+
@@ -343,7 +457,7 @@
     dynamicBlock('v205-corrective-hardware',section('Corretiva de Hardware',
       checkGroup('hardwareDefect','Tipo de defeito',HARDWARE_DEFECTS,true)+checkGroup('hardwareCause','Causa do defeito',HARDWARE_CAUSES,true)+
       yesNo('removeSwitch','Será necessário retirar a chave de campo?')+
-      yesNo('batteryReplacement','Foi necessário substituir a bateria?')+dynamicBlock('v205-corrective-battery',selectField('correctiveBatteryType','Tipo da bateria',['Chumbo Ácida','Lítio'],{required:true})+dynamicBlock('v205-corr-battery-lead',selectField('correctiveLeadCapacity','Capacidade',batteryOptionsCorrective(),{required:true}))+dynamicBlock('v205-corr-battery-lithium',selectField('correctiveLithiumCapacity','Capacidade',lithiumOptions(),{required:true})))+
+      yesNo('batteryReplacement','Foi necessário substituir a bateria?')+dynamicBlock('v205-corrective-battery',selectField('correctiveBatteryType','Tipo da bateria',['Chumbo Ácida','Lítio'],{required:true,value:battery.type})+dynamicBlock('v205-corr-battery-lead',selectField('correctiveLeadCapacity','Capacidade',batteryOptionsCorrective(),{required:true,value:battery.type==='Chumbo Ácida'?battery.capacity:''}))+dynamicBlock('v205-corr-battery-lithium',selectField('correctiveLithiumCapacity','Capacidade',lithiumOptions(),{required:true,value:battery.type==='Lítio'?battery.capacity:''})))+
       yesNo('controlParts','Foi necessário substituir peças no controle?')+dynamicBlock('v205-control-parts',textField('controlPartsDetails','Peças substituídas no controle',{required:true,full:true}))+
       yesNo('switchParts','Foi necessário substituir peças na chave?')+dynamicBlock('v205-switch-parts',textField('switchPartsDetails','Peças substituídas na chave',{required:true,full:true}))+
       yesNo('recloserPeripherals','Foi necessário substituir periféricos do religador?')+dynamicBlock('v205-recloser-peripherals',textField('recloserPeripheralsDetails','Periféricos substituídos',{required:true,full:true}))
@@ -359,15 +473,15 @@
       textField('battery12Voltage','Valor aferido no banco de 12 V',{required:true,type:'number',placeholder:'Ex.: 13.5'})+
       textField('battery48Qty','Quantidade de bancos de baterias (48 V)',{required:true,type:'number',inputmode:'numeric',value:cleanExisting(d.battery_48v_banks)})+
       textField('battery48Voltage','Valor aferido no banco de 48 V',{required:true,type:'number',placeholder:'Ex.: 54.0'})+
-      selectField('batteryType','Tipo de bateria',['Lítio','Chumbo Ácido'],{required:true,value:cleanExisting(d.battery_type)})
+      selectField('batteryType','Tipo de bateria',['Lítio','Chumbo Ácido'],{required:true,value:v209RepeaterBatteryType(d.battery_type)})
     )+
     section('Equipamentos internos e abrigo',matrixMarkup('shelterCheck',SHELTER_ROWS,['OK','Falha','Corrigido','Não Possui','Não se Aplica'])+
       dynamicBlock('v205-shelter-failure',textArea('shelterCorrection','Descreva a correção realizada ou detalhe a falha que não pôde ser corrigida.',{required:true}))+textField('txPower','Potência configurada para transmissão no rádio ou repetidora',{required:true,placeholder:'Ex.: 45 W'})+textField('directReflectedPower','Potência direta e refletida aferida do rádio fixo',{required:true})+textField('vswr','Tensão VSWR da repetidora aferida pelo software RDAC',{required:true,placeholder:'Ex.: 1.27 V'})+textArea('internalMeasurements','Valores relevantes aferidos ou coletados dos equipamentos internos',{required:true,placeholder:'Ex.: número de série, modelo, tensão...'}));
     if(isRepeater){
-      html+=section('Ciclo da preventiva',selectField('preventiveCycle','Qual preventiva está sendo realizada?',['Primeira','Segunda'],{required:true})+yesNo('hasVerticalStructure','O site possui estrutura vertical de telecomunicações? (Ex.: Torre/Poste)'))+
+      html+=section('Ciclo da preventiva',selectField('preventiveCycle','Qual preventiva está sendo realizada?',['Primeira','Segunda'],{required:true})+yesNo('hasVerticalStructure','O site possui estrutura vertical de telecomunicações? (Ex.: Torre/Poste)',true,cleanExisting(d.structure_type)?'Sim':''))+
       dynamicBlock('v205-vertical-structure',section('Estrutura vertical',
-        selectField('structureType','Tipo de estrutura',['Torre Autoportante','Torre Estaiada','Poste Duplo T','Poste Circular','Outro'],{required:true,value:cleanExisting(d.structure_type)})+
-        selectField('structureManufacturer','Fabricante da torre',['Flextower','Engefame','Adaxa','Outro'],{required:true,value:cleanExisting(d.structure_manufacturer)})+
+        selectField('structureType','Tipo de estrutura',['Torre Autoportante','Torre Estaiada','Poste Duplo T','Poste Circular','Outro'],{required:true,value:v209RepeaterStructureType(d.structure_type)})+
+        selectField('structureManufacturer','Fabricante da torre',['Flextower','Engefame','Adaxa','Outro'],{required:true,value:v209RepeaterStructureManufacturer(d.structure_manufacturer)})+
         textField('structureYear','Ano de fabricação/instalação',{required:true,type:'number',value:cleanExisting(d.installation_year)})+
         textField('structureHeight','Altura da estrutura (m)',{required:true,type:'number',value:cleanExisting(d.structure_height_m)})+
         textField('towerAev','AEV da torre',{required:true,value:cleanExisting(d.aev_tower)})+
@@ -417,7 +531,7 @@
 
   function commissioningDistributionMarkup(asset){const d=asset.data||{};return section('Comissionamento',
     textField('relayFirmware','Firmware do relé',{required:true,value:cleanExisting(d.relay_firmware||d.firmware)})+yesNo('remoteAccess','Acesso remoto parametrizado?')+
-    selectField('commissioningMedium','Meio de comunicação',['Rádio','ORBCOMM','ORBCOMM com redundância GPRS','4G/3G','Fibra Óptica'],{required:true,full:true})+
+    selectField('commissioningMedium','Meio de comunicação',['Rádio','ORBCOMM','ORBCOMM com redundância GPRS','4G/3G','Fibra Óptica','Skyedge'],{required:true,full:true,value:v209CommissioningMedium(d)})+
     textField('remoteAccessIp','IP de acesso remoto',{mask:'ipv4'})+selectField('commissioningRadioModel','Modelo do rádio',['GE MDS','GE ORBIT','Aprisa 4RF'],{})+
     textField('commissioningRadioIp','IP do rádio',{mask:'ipv4',value:cleanExisting(d.radio_ip)})+textField('commissioningRadioFirmware','Firmware do rádio',{mask:'firmware3',value:cleanExisting(d.communication_firmware)})+
     selectField('commissioningRepeater','Repetidora',repeaters().map(r=>r.display_name),{value:cleanExisting(d.repeater_name)})+
@@ -435,7 +549,7 @@
   function v205ActivitySpecificMarkup(asset,activity){
     if(state.businessFront==='distribution'){
       if(activity==='Manutenção Preventiva')return preventiveRelayMarkup(asset)+distributionClosingMarkup();
-      if(activity==='Manutenção Corretiva')return correctiveDistributionMarkup()+distributionClosingMarkup();
+      if(activity==='Manutenção Corretiva')return correctiveDistributionMarkup(asset)+distributionClosingMarkup();
       if(activity==='Comissionamento de ativo')return commissioningDistributionMarkup(asset);
     }
     if(state.businessFront==='telecom'){
@@ -471,13 +585,13 @@
     const record={id,numeroRelatorio:number,idempotencyKey:id,version:V205_VERSION,businessFront:state.businessFront,usuario:currentUser(),subestacao:substation,frontAssetIds:[asset.id],frontAssetsSnapshot:[asset],equipamentos:[],equipamentosSnapshot:[],form:{...values,assetChangesJson:JSON.stringify(changes)},assetChanges:changes,resultado:values.activityStatus==='Pendente'?'inconclusivo':'concluido',criadoEm:created,updatedAt:created,revisao:1,status:initialLocalStatus()};
     await idbPut('maintenanceRecords',record);for(let i=0;i<state.pendingPhotos.length;i++){const p=state.pendingPhotos[i];await idbPut('maintenancePhotos',{id:`${id}_${p.id||i}`,maintenanceId:id,assetId:asset.id,frontAssetId:asset.id,blob:p.blob,category:p.category,caption:p.caption||'',latitude:p.latitude??null,longitude:p.longitude??null,criadoEm:created})}
     await addAudit(record.id,'criado','Relatório multi-frente confirmado após revisão.',[], '',record.status);await enqueueSync(record);await idbDelete('drafts',`v205:${state.businessFront}:${asset.id}`).catch(()=>{});state.pendingPhotos=[];await processSyncQueue();await updateConnectivityIndicator();
-    main.innerHTML=`<section class="panel v205-success"><div class="v205-success-icon">✓</div><h2>Relatório registrado</h2><p class="muted">${esc(frontLabel(state.businessFront))} · ${esc(frontAssetTitle(asset))}<br>Status: <b>${esc(statusMeta(record.status).label)}</b></p><div><button class="btn secondary" id="v205-success-home">Início</button><button class="btn primary" id="v205-success-new">Nova manutenção</button></div></section>`;document.getElementById('v205-success-home').onclick=renderHome;document.getElementById('v205-success-new').onclick=()=>{state.v205Asset=null;state.v205Activity=null;renderSubstations()};
+    main.innerHTML=`<section class="panel v205-success"><div class="v205-success-icon">✓</div><h2>Relatório registrado</h2><p class="muted">${esc(frontLabel(state.businessFront))} · ${esc(frontAssetTitle(asset))}<br>Status: <b>${esc(statusMeta(record.status).label)}</b></p><div><button class="btn secondary" id="v205-success-home">Início</button><button class="btn primary" id="v205-success-new">Nova manutenção</button></div></section>`;document.getElementById('v205-success-home').onclick=renderHome;document.getElementById('v205-success-new').onclick=()=>{state.v205Asset=null;state.v205Activity=null;if(state.v209EmbeddedTelecomSubstation){const sub=state.v209EmbeddedTelecomSubstation;state.v209EmbeddedTelecomSubstation=null;state.businessFront='substation';state.sub=sub;return renderEquipment()}renderSubstations()};
   }
 
   /* ---------- navegação de manutenção multi-frente ---------- */
   renderBusinessFrontSelector=function(){
     state.screen='business-front';setActiveNav('maintenance');const fronts=[...(state.businessFronts||[])].sort((a,b)=>Number(a.sort_order||100)-Number(b.sort_order||100));
-    main.innerHTML=`<section class="business-front-shell"><div class="head-row business-front-head"><div><button class="back" id="front-back-home" type="button"><span data-icon="arrow-left"></span></button><h1>Nova Manutenção</h1><p>Escolha a frente de negócio.</p></div></div><div class="business-front-grid">${fronts.map(front=>{const enabled=front.active!==false;const meta=front.code==='substation'?{icon:'settings',description:'Manutenções e atendimentos em ativos de subestações.'}:front.code==='distribution'?{icon:'tool',description:'Religadores e reguladores de tensão da Distribuição.'}:{icon:'wifi',description:'Repetidoras e equipamentos de Telecom em subestações.'};return `<button class="business-front-card" type="button" data-front="${esc(front.code)}" ${enabled?'':'disabled'}><span class="business-front-icon" data-icon="${meta.icon}"></span><h2>${esc(front.label)}</h2><p>${esc(meta.description)}</p><span class="business-front-state">${enabled?'<span data-icon="check"></span>Disponível':'Indisponível'}</span></button>`}).join('')}</div></section>`;
+    main.innerHTML=`<section class="business-front-shell"><div class="head-row business-front-head"><div><button class="back" id="front-back-home" type="button"><span data-icon="arrow-left"></span></button><h1>Nova Manutenção</h1><p>Escolha a frente de negócio.</p></div></div><div class="business-front-grid">${fronts.map(front=>{const enabled=front.active!==false;const meta=front.code==='substation'?{icon:'settings',description:'Manutenções e atendimentos em ativos de subestações.'}:front.code==='distribution'?{icon:'tool',description:'Religadores e reguladores de tensão da Distribuição.'}:{icon:'wifi',description:'Manutenções e atendimentos nas Repetidoras de Telecom.'};return `<button class="business-front-card" type="button" data-front="${esc(front.code)}" ${enabled?'':'disabled'}><span class="business-front-icon" data-icon="${meta.icon}"></span><h2>${esc(front.label)}</h2><p>${esc(meta.description)}</p><span class="business-front-state">${enabled?'<span data-icon="check"></span>Disponível':'Indisponível'}</span></button>`}).join('')}</div></section>`;
     hydrateIcons(main);document.getElementById('front-back-home').onclick=()=>{state.businessFront=null;renderHome()};main.querySelectorAll('[data-front]:not(:disabled)').forEach(b=>b.onclick=()=>{state.businessFront=b.dataset.front;state.v205Asset=null;state.v205Activity=null;if(state.businessFront==='substation')return v205BaseRenderSubstations();if(state.businessFront==='distribution')return renderDistributionMaintenance();return renderTelecomMaintenance()});
   };
 
@@ -510,12 +624,24 @@
   }
 
   function renderTelecomMaintenance(){
-    state.screen='v205-telecom';setActiveNav('maintenance');
-    main.innerHTML=`<section class="v205-page"><div class="head-row"><div><button class="back" id="v205-tel-back"><span data-icon="arrow-left"></span></button><h1>Telecom</h1><p class="muted">Escolha o local de atendimento.</p></div></div><div class="v205-activity-grid"><button class="operation-card" data-telecom-location="repeater"><span class="operation-icon" data-icon="wifi"></span><h3>Repetidora</h3><p>Selecione uma repetidora cadastrada.</p></button><button class="operation-card orange" data-telecom-location="substation"><span class="operation-icon" data-icon="database"></span><h3>Subestação</h3><p>Selecione uma subestação com infraestrutura de Telecom.</p></button></div><div id="v205-telecom-picker"></div></section>`;hydrateIcons(main);document.getElementById('v205-tel-back').onclick=()=>{state.businessFront=null;state.v205TelecomLocation=null;renderBusinessFrontSelector()};document.querySelectorAll('[data-telecom-location]').forEach(b=>b.onclick=()=>{state.v205TelecomLocation=b.dataset.telecomLocation;drawTelecomPicker()});if(state.v205TelecomLocation)drawTelecomPicker();
+    state.screen='v205-telecom';setActiveNav('maintenance');state.v205TelecomLocation='repeater';
+    main.innerHTML=`<section class="v205-page"><div class="head-row"><div><button class="back" id="v205-tel-back"><span data-icon="arrow-left"></span></button><h1>Telecom</h1><p class="muted">Selecione uma repetidora cadastrada.</p></div></div><div id="v205-telecom-picker"></div></section>`;
+    hydrateIcons(main);document.getElementById('v205-tel-back').onclick=()=>{state.businessFront=null;state.v205TelecomLocation=null;renderBusinessFrontSelector()};drawTelecomPicker();
   }
   function drawTelecomPicker(){const host=document.getElementById('v205-telecom-picker');if(!host)return;const type=state.v205TelecomLocation;if(type==='repeater'){host.innerHTML=`<section class="panel v205-picker-panel"><div class="search"><input id="v205-repeater-search" placeholder="Buscar repetidora"></div><div id="v205-repeater-list" class="v205-asset-results"></div></section>`;const input=document.getElementById('v205-repeater-search');const draw=()=>{const q=norm(input.value);const rows=repeaters().filter(r=>!q||norm([r.display_name,r.location_name,r.data?.city].join(' ')).includes(q));document.getElementById('v205-repeater-list').innerHTML=rows.map(r=>`<button class="v205-asset-row" data-v205-repeater="${r.id}"><div><strong>${esc(r.display_name)}</strong><span>${esc([r.location_name,r.data?.structure_type,r.data?.structure_height_m?`${r.data.structure_height_m} m`:null].filter(Boolean).join(' · '))}</span></div></button>`).join('');document.querySelectorAll('[data-v205-repeater]').forEach(b=>b.onclick=()=>{state.v205Asset=state.frontAssetMap.get(b.dataset.v205Repeater);renderV205ActivityChoice(state.v205Asset)})};input.oninput=draw;draw();return}
     const rows=DATA.substations.map(s=>{const site=telecomSites().find(t=>t.substation_code===s.id);return {s,site}}).filter(x=>x.site);host.innerHTML=`<section class="panel v205-picker-panel"><div class="search"><input id="v205-tel-sub-search" placeholder="Buscar subestação por nome ou sigla"></div><div id="v205-tel-sub-list" class="v205-asset-results"></div></section>`;const input=document.getElementById('v205-tel-sub-search');const draw=()=>{const q=norm(input.value);const list=rows.filter(x=>!q||norm(`${x.s.sigla} ${x.s.nome}`).includes(q)).slice(0,30);document.getElementById('v205-tel-sub-list').innerHTML=list.map(({s,site})=>`<button class="v205-asset-row" data-v205-tel-site="${site.id}" data-sub="${s.id}"><div><strong>${esc(s.sigla)} — ${esc(s.nome)}</strong><span>${telecomChildren(site.id).length} equipamento(s) de comunicação</span></div></button>`).join('');document.querySelectorAll('[data-v205-tel-site]').forEach(b=>b.onclick=()=>{state.v205TelecomSubstation=b.dataset.sub;state.v205Asset=state.frontAssetMap.get(b.dataset.v205TelSite);renderV205ActivityChoice(state.v205Asset)})};input.oninput=draw;draw();
   }
+
+  /* Ponte v2.0.9: permite que a seleção de Subestação abra um equipamento
+     de Comunicação preservando o registro canônico em front_assets. */
+  globalThis.CENTRAL_V205_OPEN_FRONT_ASSET=function(assetId,options={}){
+    const asset=state.frontAssetMap.get(assetId);if(!asset)return false;
+    state.businessFront=options.front||asset.business_front||'telecom';
+    state.v205Asset=asset;state.v205Activity=null;
+    state.v205TelecomSubstation=options.substationId||asset.substation_code||null;
+    if(options.embeddedSubstation)state.v209EmbeddedTelecomSubstation=options.embeddedSubstation;
+    renderV205ActivityChoice(asset);return true;
+  };
 
   /* ---------- Banco de Dados multi-frente ---------- */
   const v205BaseRenderDatabase=renderDatabase;
@@ -637,7 +763,7 @@
     if(edit){record={...edit,cloud:false,businessFront:state.businessFront,frontAssetIds:[asset.id],frontAssetsSnapshot:[asset],equipamentos:[],equipamentosSnapshot:[],form,assetChanges:changes,resultado:values.activityStatus==='Pendente'?'inconclusivo':'concluido',updatedAt:now,revisao:Number(edit.revisao||1)+1,status:'corrigido',motivoReprovacao:''};await idbPut('maintenanceRecords',record);await addAudit(record.id,'corrigido',values.correctionReason||'Correção do relatório.',[],edit.status,'corrigido')}
     else{const id=uid();record={id,numeroRelatorio:ensureReportNumber?.()||`R-${Date.now()}`,idempotencyKey:id,version:V205_VERSION,businessFront:state.businessFront,usuario:currentUser(),subestacao:v205SubstationForAsset(asset),frontAssetIds:[asset.id],frontAssetsSnapshot:[asset],equipamentos:[],equipamentosSnapshot:[],form,assetChanges:changes,resultado:values.activityStatus==='Pendente'?'inconclusivo':'concluido',criadoEm:created,updatedAt:now,revisao:1,status:initialLocalStatus()};await idbPut('maintenanceRecords',record);await addAudit(record.id,'criado','Relatório multi-frente confirmado após revisão.',[], '',record.status)}
     for(let i=0;i<state.pendingPhotos.length;i++){const p=state.pendingPhotos[i];await idbPut('maintenancePhotos',{id:`${record.id}_${p.id||i}_${Date.now()}`,maintenanceId:record.id,assetId:asset.id,frontAssetId:asset.id,blob:p.blob,category:p.category,caption:p.caption||'',latitude:p.latitude??null,longitude:p.longitude??null,criadoEm:now})}
-    await enqueueSync(record);await idbDelete('drafts',`v205:${state.businessFront}:${asset.id}`).catch(()=>{});state.pendingPhotos=[];state.v205EditRecord=null;await processSyncQueue();await updateConnectivityIndicator();main.innerHTML=`<section class="panel v205-success"><div class="v205-success-icon">✓</div><h2>${edit?'Correção registrada':'Relatório registrado'}</h2><p class="muted">${esc(frontLabel(state.businessFront))} · ${esc(frontAssetTitle(asset))}<br>Status: <b>${esc(statusMeta(record.status).label)}</b></p><div><button class="btn secondary" id="v205-success-home">Início</button><button class="btn primary" id="v205-success-new">Nova manutenção</button></div></section>`;document.getElementById('v205-success-home').onclick=renderHome;document.getElementById('v205-success-new').onclick=()=>{state.v205Asset=null;state.v205Activity=null;renderSubstations()};
+    await enqueueSync(record);await idbDelete('drafts',`v205:${state.businessFront}:${asset.id}`).catch(()=>{});state.pendingPhotos=[];state.v205EditRecord=null;await processSyncQueue();await updateConnectivityIndicator();main.innerHTML=`<section class="panel v205-success"><div class="v205-success-icon">✓</div><h2>${edit?'Correção registrada':'Relatório registrado'}</h2><p class="muted">${esc(frontLabel(state.businessFront))} · ${esc(frontAssetTitle(asset))}<br>Status: <b>${esc(statusMeta(record.status).label)}</b></p><div><button class="btn secondary" id="v205-success-home">Início</button><button class="btn primary" id="v205-success-new">Nova manutenção</button></div></section>`;document.getElementById('v205-success-home').onclick=renderHome;document.getElementById('v205-success-new').onclick=()=>{state.v205Asset=null;state.v205Activity=null;if(state.v209EmbeddedTelecomSubstation){const sub=state.v209EmbeddedTelecomSubstation;state.v209EmbeddedTelecomSubstation=null;state.businessFront='substation';state.sub=sub;return renderEquipment()}renderSubstations()};
   };
 
   /* ---------- divergência cadastral também em Subestações ---------- */

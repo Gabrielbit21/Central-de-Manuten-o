@@ -1,0 +1,27 @@
+/* Central de Manutenção SE — v2.0.9 */
+
+/* Categoria Comunicação dentro da seleção da Subestação. */
+.v209-communication-group .v209-communication-head{
+  display:grid;
+  grid-template-columns:28px 1fr auto;
+  align-items:center;
+  gap:10px;
+}
+.v209-communication-icon{
+  width:22px;
+  height:22px;
+  display:grid;
+  place-items:center;
+  color:var(--blue);
+}
+.v209-communication-equip small{
+  display:block;
+  color:var(--muted);
+  margin-top:3px;
+}
+
+/* A foto principal volta a usar somente o seletor oficial de mídia.
+   O modal paralelo da 2.0.8 não é utilizado na 2.0.9. */
+#v208-profile-source-modal{
+  display:none!important;
+}
