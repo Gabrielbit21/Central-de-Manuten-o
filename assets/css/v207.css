@@ -1,0 +1,23 @@
+/* Central v2.0.7 */
+.v207-photo-box{position:relative;overflow:visible!important}
+.v207-photo-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.v207-photo-actions button{border:1px solid var(--line);background:#fff;color:var(--blue-dark);border-radius:8px;padding:7px 9px;font-size:10px;font-weight:800}
+.v206-asset-summary-card .v207-photo-actions{position:absolute;left:0;right:0;bottom:-38px;justify-content:center}
+.v206-asset-summary-card{margin-bottom:38px}
+.v207-team-control{position:relative;display:grid;gap:7px}
+.v207-team-button{width:100%;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px 12px;color:var(--ink);text-align:left}
+.v207-team-menu{position:absolute;left:0;right:0;top:46px;z-index:25;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:8px;max-height:260px;overflow:auto}
+.v207-team-menu label{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:8px;font-size:12px}.v207-team-menu label:hover{background:#f5fafb}
+.v207-team-menu input{width:17px;height:17px}.v207-team-chips{display:flex;gap:6px;flex-wrap:wrap}.v207-team-chips span{background:var(--blue-soft);color:var(--blue-dark);border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}
+.v207-activity-field{grid-column:1/-1}
+.v207-ops-front-grid{margin-top:16px}.v207-ops-front-grid .business-front-card strong,.v207-ops-front-grid .business-front-card small{display:none}
+.v207-telecom-tree-assets{display:grid;gap:4px;padding:4px 10px 12px}.v207-substation-telecom-leaf{border:0;border-bottom:1px solid #edf2f4;background:#fff;text-align:left;padding:11px 12px}.v207-substation-telecom-leaf strong{display:block}.v207-substation-telecom-leaf span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.v207-repeater-list{display:grid;gap:2px}.v207-repeater-list>button{border:0;border-bottom:1px solid #edf2f4;background:#fff;text-align:left;padding:15px 12px}.v207-repeater-list strong{display:block;font-size:14px}.v207-repeater-list span{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.v207-repeater-detail,.v207-asset-detail{max-width:1280px}.v207-repeater-photo{display:grid;align-content:start;gap:8px}.v207-repeater-photo .asset-modal-photo{width:180px;height:180px}.v207-repeater-photo .asset-modal-photo img{width:100%;height:100%;object-fit:cover}
+.v207-linked-relays{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}.v207-linked-relays button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px;text-align:left}.v207-linked-relays strong{display:block}.v207-linked-relays span{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+.v207-route{background:var(--orange)!important}.v207-route:hover{background:var(--orange-dark)!important}
+.v207-report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}.v207-report-grid>div{padding:10px 0;border-bottom:1px solid #edf2f4}.v207-report-grid b{display:block;color:#52656e;font-size:10px;text-transform:uppercase;margin-bottom:4px}.v207-report-grid span{font-size:12px;line-height:1.45}
+.v207-history-modal{max-width:1220px}
+.v205-top-tabs [data-db-front="all"],.v205-family-tabs [data-db-tel="substation"]{display:none!important}
+@media(max-width:900px){.v207-report-grid{grid-template-columns:1fr}.v207-repeater-photo .asset-modal-photo{width:130px;height:130px}}
+@media(max-width:760px){.v207-team-menu{position:static}.v206-asset-summary-card .v207-photo-actions{position:static}.v206-asset-summary-card{margin-bottom:0}.v207-repeater-photo{justify-items:center}.v207-repeater-photo .asset-modal-photo{width:150px;height:150px}}
