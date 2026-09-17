@@ -7,6 +7,52 @@ const V300_VERSION='3.0.0';
 const safe=v=>String(v??'');
 const norm=v=>{try{return normalize(safe(v))}catch(_){return safe(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()}};
 const esc300=v=>safe(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const V300_LAST_FIRST_NAME_KEY='central_last_first_name';
+
+function v300FirstName(value){
+  return safe(value).trim().split(/\s+/)[0]||'';
+}
+
+function v300RememberFirstName(profile){
+  const name=v300FirstName(profile?.display_name);
+  if(name)localStorage.setItem(V300_LAST_FIRST_NAME_KEY,name);
+}
+
+function v300KnownFirstName(){
+  try{
+    const cached=JSON.parse(localStorage.getItem('central_offline_identity')||'null');
+    return v300FirstName(cached?.profile?.display_name)
+      || localStorage.getItem(V300_LAST_FIRST_NAME_KEY)
+      || '';
+  }catch(_){
+    return localStorage.getItem(V300_LAST_FIRST_NAME_KEY)||'';
+  }
+}
+
+function v300UpdateLoginGreeting(){
+  const shell=document.getElementById('auth-shell');
+  if(!shell)return;
+
+  const title=[...shell.querySelectorAll('h1,h2')]
+    .find(x=>/olá|ola|bem-vindo/i.test(x.textContent||''))
+    || shell.querySelector('h1');
+
+  if(!title)return;
+
+  const name=v300KnownFirstName();
+  const text=name?`Olá, ${name}.`:'Olá, seja bem-vindo.';
+
+  if(title.textContent!==text)title.textContent=text;
+}
+
+if(typeof storeIdentity==='function'){
+  const v300BaseStoreIdentity=storeIdentity;
+
+  storeIdentity=function(user,profile){
+    v300RememberFirstName(profile);
+    return v300BaseStoreIdentity(user,profile);
+  };
+}
 const FAMILY={distribution_recloser:'Religador de Distribuição',voltage_regulator:'Regulador de Tensão',repeater:'Repetidora',telecom_site:'Local de Telecom',radio_voice_vhf:'Rádio de Voz VHF',radio_data_uhf:'Rádio de Dados UHF',radio_microwave:'Rádio Micro-ondas',converter_125_12:'Conversor 125/12 Vcc',converter_125_12_detailed:'Conversor 125/12 Vcc',converter_125_48:'Conversor 125/48 Vcc',router:'Roteador / Switch',claroty:'Claroty'};
 const familyLabel=c=>FAMILY[c]||safe(c).replace(/_/g,' ');
 const frontAssets=()=>Array.isArray(state?.frontAssets)?state.frontAssets:[];
@@ -217,15 +263,41 @@ window.addEventListener('click',event=>{
 },true);
 
 function enhance(){
+  v300UpdateLoginGreeting();
   styleIntegrationEntry();
   enhanceCommunicationGroup();
   enhanceCommunicationSuccess();
   installQueueBackCleanup();
   enhanceDatabaseGroups();
 }
+
 let scheduled=false;
-function scheduleEnhance(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;enhance()})}
+
+function scheduleEnhance(){
+  if(scheduled)return;
+
+  scheduled=true;
+
+  requestAnimationFrame(()=>{
+    scheduled=false;
+    enhance();
+  });
+}
+
 const observer=new MutationObserver(scheduleEnhance);
+
 if(main)observer.observe(main,{childList:true,subtree:true});
+
 scheduleEnhance();
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    v300UpdateLoginGreeting();
+  }
+});
+
+window.addEventListener('pageshow',v300UpdateLoginGreeting);
+
+setTimeout(v300UpdateLoginGreeting,0);
+
 })();
