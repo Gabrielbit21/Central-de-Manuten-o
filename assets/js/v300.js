@@ -32,7 +32,15 @@ function v300KnownFirstName(){
 function v300UpdateLoginGreeting(){
   const shell=document.getElementById('auth-shell');
   if(!shell)return;
+  const email=shell.querySelector('#login-form input[name="email"]');
 
+if(email && email.dataset.v300Greeting!=='1'){
+  email.dataset.v300Greeting='1';
+
+  email.addEventListener('input',()=>{
+    requestAnimationFrame(v300UpdateLoginGreeting);
+  });
+}
   const title=[...shell.querySelectorAll('h1,h2')]
     .find(x=>/olá|ola|bem-vindo/i.test(x.textContent||''))
     || shell.querySelector('h1');
