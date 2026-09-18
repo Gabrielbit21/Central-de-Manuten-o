@@ -644,7 +644,7 @@
           <button type="button" class="asset-modal-photo v206-front-photo ${photo?'has-photo':''}" id="v206-front-photo">
             ${photo?`<img src="${blobUrl(photo)}" alt="Foto do ativo"><span class="v206-photo-hover">Alterar foto</span>`:'<span data-icon="settings"></span><small>Adicionar foto do ativo</small>'}
           </button>
-          ${canRoute?'<button class="btn primary v301-front-route" id="v206-detail-route" type="button"><span data-icon="arrow-right"></span>Traçar rota</button>':''}
+          ${canRoute?'<button class="btn accent v301-front-route" id="v206-detail-route" type="button"><span data-icon="arrow-right"></span>Traçar rota</button>':''}
         </aside>
 
         <form id="v301-front-edit-form" class="v301-front-detail-content">
