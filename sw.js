@@ -1,4 +1,4 @@
-const SW_VERSION = '3.0.3-media-v10.2';
+const SW_VERSION = '3.1.0-media-v11';
 const STATIC_CACHE = `central-static-${SW_VERSION}`;
 const APP_SHELL = [
   './',
@@ -15,6 +15,7 @@ const APP_SHELL = [
   './assets/js/v209.js',
   './assets/js/v300.js',
   './assets/js/media-core.js',
+  './assets/js/v310.js',
   './assets/css/v205.css',
   './assets/css/v206.css',
   './assets/css/v207.css',
@@ -22,6 +23,7 @@ const APP_SHELL = [
   './assets/css/v209.css',
   './assets/css/v300.css',
   './assets/css/media-core.css',
+  './assets/css/v310.css',
   './assets/data/v205/front-assets.json',
   './assets/data/v205/front-history.json',
   './assets/data/v207/telecom-history.json',
@@ -69,6 +71,7 @@ self.addEventListener('fetch', event => {
     '/assets/js/v209.js',
     '/assets/js/v300.js',
     '/assets/js/media-core.js',
+    '/assets/js/v310.js',
     '/assets/css/v205.css',
     '/assets/css/v206.css',
     '/assets/css/v207.css',
@@ -76,6 +79,7 @@ self.addEventListener('fetch', event => {
     '/assets/css/v209.css',
     '/assets/css/v300.css',
     '/assets/css/media-core.css',
+    '/assets/css/v310.css',
     '/assets/data/v205/front-assets.json',
     '/assets/data/v205/front-history.json',
     '/assets/data/v207/telecom-history.json',

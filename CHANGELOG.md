@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.1.0 — 2026-09-18 — Árvore de Comunicação
+
+- **Comunicação** passa a ser um ramo nativo da árvore de cada Subestação, sem duplicar os registros canônicos de Telecom;
+- ativos de Telecom vinculados por `telecom_site` e `substation_code` passam a aparecer também na visualização em lista e nas contagens da Subestação;
+- busca da Subestação passa a localizar os ativos do ramo Comunicação;
+- ficha de Repetidora passa a apresentar os religadores vinculados em um mapa visual de árvore, preservando a navegação para a ficha do religador;
+- ficha canônica de `front_assets` é reutilizada ao abrir um ativo de Comunicação pela Subestação;
+- versão de aplicativo, pacote Android e cache offline sincronizados em **3.1.0**.
+
 ## v1.9.0 — 2026-08-14 — Corporate Ready / Security Hardening
 
 - removida a base operacional embarcada no frontend estático;
