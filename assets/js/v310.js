@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v3.1.0
+/* Central de Manutenção SE — v3.1.1
  * Relações visuais entre Subestações, Telecom e Religadores.
  * Camada pequena e reversível carregada por último.
  */
@@ -7,7 +7,7 @@
   if (globalThis.__CENTRAL_V310__) return;
   globalThis.__CENTRAL_V310__ = true;
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.1.1';
   const safe = value => String(value ?? '');
   const norm = value => safe(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
   const esc = value => safe(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -171,18 +171,24 @@
     if (branches.querySelector('.v310-communication-branch')) return;
 
     const q = currentSearch();
-    if (q) state.v310CommunicationOpen = true;
-    if (typeof state.v310CommunicationOpen !== 'boolean') state.v310CommunicationOpen = false;
-    state.v310CommunicationOpenTypes = state.v310CommunicationOpenTypes || {};
+    const categoryKey = 'Comunicação';
+    state.databaseOrgOpenCategories = state.databaseOrgOpenCategories || {};
+    state.databaseOrgOpenTypes = state.databaseOrgOpenTypes || {};
+    if (!Object.prototype.hasOwnProperty.call(state.databaseOrgOpenCategories, categoryKey)) {
+      state.databaseOrgOpenCategories[categoryKey] = false;
+    }
 
-    const open = state.v310CommunicationOpen;
+    const open = !!q || !!state.databaseOrgOpenCategories[categoryKey];
     const groups = groupCommunication(rows);
+    if (open && !q && !Object.keys(state.databaseOrgOpenTypes).some(key => key.startsWith(categoryKey + '::')) && groups[0]) {
+      state.databaseOrgOpenTypes[categoryKey + '::' + typeKey(groups[0][0])] = true;
+    }
     let typesHtml = '';
     if (open) {
       typesHtml = '<div class="org-category-content v310-communication-content"><div class="org-type-stack">';
       groups.forEach(([label, items]) => {
-        const key = typeKey(label);
-        const typeOpen = !!q || !!state.v310CommunicationOpenTypes[key];
+        const key = categoryKey + '::' + typeKey(label);
+        const typeOpen = !!q || !!state.databaseOrgOpenTypes[key];
         typesHtml += '<section class="org-type v310-communication-type">' +
           '<button class="org-type-node ' + (typeOpen ? 'active' : '') + '" data-v310-comm-type="' + esc(key) + '" type="button">' +
           '<span>' + esc(label) + '</span><b>' + items.length + '</b></button>' +
@@ -203,14 +209,14 @@
     branches.style.setProperty('--branch-count', String(branches.querySelectorAll(':scope > .org-branch').length));
 
     branch.querySelector('[data-v310-communication-toggle]')?.addEventListener('click', () => {
-      state.v310CommunicationOpen = !state.v310CommunicationOpen;
+      state.databaseOrgOpenCategories[categoryKey] = !state.databaseOrgOpenCategories[categoryKey];
       branch.remove();
       renderSubstationCommunication();
     });
     branch.querySelectorAll('[data-v310-comm-type]').forEach(button => {
       button.addEventListener('click', () => {
         const key = button.dataset.v310CommType;
-        state.v310CommunicationOpenTypes[key] = !state.v310CommunicationOpenTypes[key];
+        state.databaseOrgOpenTypes[key] = !state.databaseOrgOpenTypes[key];
         branch.remove();
         renderSubstationCommunication();
       });
@@ -283,35 +289,45 @@
   function enhanceRepeaterRelationshipTree() {
     const modal = document.getElementById('v207-repeater-modal');
     const list = modal?.querySelector('.v207-linked-relays');
-    if (!modal || !list || list.dataset.v310Tree === '1') return;
-    const buttons = [...list.querySelectorAll(':scope > button')];
-    if (!buttons.length) return;
-
-    list.dataset.v310Tree = '1';
-    list.classList.add('v310-relay-nodes');
+    if (!modal || !list) return;
     const block = list.closest('.detail-block');
-    if (!block) return;
-    block.classList.add('v310-repeater-link-block');
+    if (!block || block.dataset.v311Tree === '1') return;
 
+    const sourceButtons = [...list.querySelectorAll(':scope > button')];
+    if (!sourceButtons.length) return;
+    const relays = sourceButtons.map(button => ({
+      id: button.dataset.v207LinkedRelay,
+      title: button.querySelector('strong')?.textContent?.trim() || 'Religador',
+      detail: button.querySelector('span')?.textContent?.trim() || 'Abrir ficha do religador'
+    })).filter(item => item.id);
+    if (!relays.length) return;
+
+    block.dataset.v311Tree = '1';
+    block.classList.add('v311-repeater-link-block');
     const heading = block.querySelector(':scope > h3');
     if (heading) heading.textContent = 'Mapa de vínculos';
 
     const rootTitle = modal.querySelector('.report-header h2')?.textContent?.trim() || 'Repetidora';
-    const rootMeta = modal.querySelector('.report-header .muted')?.textContent?.trim() || '';
+    const countLabel = relays.length === 1 ? '1 religador conectado' : relays.length + ' religadores conectados';
+    const columns = Math.max(1, Math.min(relays.length, 4));
     const tree = document.createElement('div');
-    tree.className = 'v310-repeater-relationship-tree';
+    tree.className = 'database-org-tree v311-repeater-tree';
     tree.innerHTML =
-      '<div class="v310-repeater-root-wrap"><div class="v310-repeater-root">' +
-        '<span data-icon="wifi"></span><div><small>Repetidora</small><strong>' + esc(rootTitle) + '</strong>' +
-        (rootMeta ? '<span>' + esc(rootMeta) + '</span>' : '') + '</div></div></div>' +
-      '<div class="v310-repeater-stem"></div>' +
-      '<div class="v310-repeater-relation"><span data-icon="tool"></span><strong>Religadores conectados</strong><b>' + buttons.length + '</b></div>' +
-      '<div class="v310-repeater-relation-stem"></div>';
+      '<svg class="org-connectors" aria-hidden="true"></svg>' +
+      '<div class="org-root-wrap"><div class="org-root-node v311-repeater-root"><strong>' + esc(rootTitle) + '</strong><small>' + esc(countLabel) + '</small></div></div>' +
+      '<div class="org-root-stem"></div>' +
+      '<div class="org-branches v311-repeater-branches" style="--branch-count:' + columns + '">' +
+        relays.map(relay => '<section class="org-branch v311-repeater-branch"><button type="button" class="org-asset-node org-direct-node v311-repeater-relay-node" data-v311-relay="' + esc(relay.id) + '"><strong>' + esc(relay.title) + '</strong><small>' + esc(relay.detail) + '</small></button></section>').join('') +
+      '</div>';
 
-    block.insertBefore(tree, list);
-    tree.appendChild(list);
-    buttons.forEach(button => button.classList.add('v310-relay-node'));
+    list.replaceWith(tree);
+    tree.querySelectorAll('[data-v311-relay]').forEach(button => {
+      button.addEventListener('click', () => openFrontAsset(button.dataset.v311Relay));
+    });
     if (typeof hydrateIcons === 'function') hydrateIcons(tree);
+    requestAnimationFrame(() => {
+      try { if (typeof drawOrgConnectors === 'function') drawOrgConnectors(block); } catch (_) {}
+    });
   }
 
   function enhance() {
