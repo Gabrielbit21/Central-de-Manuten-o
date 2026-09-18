@@ -88,7 +88,7 @@
     return `<div class="v206-asset-summary-card">
       <div class="v206-asset-photo ${image ? 'has-image' : ''}">${image ? `<img src="${escapeHtml(image)}" alt="Imagem do ativo">` : `<span data-icon="settings"></span><small>Sem imagem</small>`}</div>
       <div class="v206-asset-summary-info">
-        <div class="v206-asset-summary-head"><strong>${escapeHtml(assetTitle(asset))}</strong><span>${escapeHtml(familyLabel(asset.family_code))}</span></div>
+        <div class="v206-asset-summary-head"><strong>${escapeHtml(assetTitle(asset))}</strong></div>
         <div class="v206-asset-meta">${primary.map(([k,v]) => `<span><b>${escapeHtml(k)}</b>${escapeHtml(detailValue(v))}</span>`).join('')}</div>
       </div>
     </div>`;
