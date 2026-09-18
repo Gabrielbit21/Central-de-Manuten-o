@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.1.1 — 2026-09-18 — Refinamentos das árvores e ficha canônica
+
+- ramos **Eletrônicos**, **Relés**, **Pátio** e **Comunicação** passam a abrir e retrair de forma independente na árvore da Subestação;
+- a busca continua expandindo automaticamente os ramos com resultados, sem apagar o estado manual do usuário;
+- **Comunicação** passa a usar o mesmo estado de expansão das demais classes da árvore;
+- a árvore da ficha de **Repetidora** passa a reutilizar o mesmo organograma visual da tela de Subestações;
+- removido o nível intermediário **Religadores conectados**: os Religadores saem diretamente do nó da Repetidora;
+- a quantidade de Religadores conectados passa a ser exibida dentro do próprio nó da Repetidora;
+- o clique em um Religador vinculado passa a abrir a **ficha canônica existente**, eliminando a ficha paralela usada na v3.1.0;
+- versões Web, Windows/Android e cache offline sincronizados em **3.1.1**.
+
 ## v3.1.0 — 2026-09-18 — Árvore de Comunicação
 
 - **Comunicação** passa a ser um ramo nativo da árvore de cada Subestação, sem duplicar os registros canônicos de Telecom;

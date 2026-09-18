@@ -1,7 +1,7 @@
-/* Central de Manutenção SE — v3.1.0 */
+/* Central de Manutenção SE — v3.1.1 */
 
 /* A camada v207 tentava encaixar Telecom em tipos legados de Eletrônicos.
-   Na v3.1.0 Comunicação é um ramo próprio, portanto o enxerto antigo fica oculto. */
+   Na v3.1.1 Comunicação permanece como ramo próprio, portanto o enxerto antigo fica oculto. */
 .v207-telecom-tree-assets{display:none!important}
 
 /* Ramo Comunicação dentro da árvore moderna da Subestação */
@@ -37,166 +37,26 @@
   min-width:170px;
 }
 
-/* Árvore de vínculos na ficha da Repetidora */
-.v310-repeater-link-block{
-  overflow:hidden;
-}
-.v310-repeater-relationship-tree{
-  position:relative;
-  padding:8px 4px 4px;
-  overflow-x:auto;
-}
-.v310-repeater-root-wrap{
-  display:flex;
-  justify-content:center;
-}
-.v310-repeater-root{
-  min-width:280px;
-  max-width:520px;
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:14px 18px;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:#fff;
-  box-shadow:var(--shadow);
-}
-.v310-repeater-root>[data-icon]{
-  width:28px;
-  height:28px;
-  flex:0 0 auto;
-  color:var(--blue-dark);
-}
-.v310-repeater-root div{
+/* Árvore de vínculos da Repetidora: reutiliza o mesmo organograma da Subestação. */
+.v311-repeater-link-block{overflow:hidden}
+.v311-repeater-tree{min-height:0;padding-top:8px}
+.v311-repeater-tree .org-root-node{min-width:250px}
+.v311-repeater-branches{
   min-width:0;
+  grid-template-columns:repeat(var(--branch-count),minmax(180px,1fr));
+  gap:26px 16px;
 }
-.v310-repeater-root small{
-  display:block;
-  color:var(--muted);
-  font-size:9px;
-  font-weight:800;
-  text-transform:uppercase;
-  letter-spacing:.05em;
-}
-.v310-repeater-root strong{
-  display:block;
-  margin-top:2px;
-  font-size:15px;
-}
-.v310-repeater-root div>span{
-  display:block;
-  margin-top:3px;
-  color:var(--muted);
-  font-size:10px;
-}
-.v310-repeater-stem,
-.v310-repeater-relation-stem{
-  width:2px;
-  height:28px;
-  margin:0 auto;
-  background:var(--line);
-}
-.v310-repeater-relation{
-  width:max-content;
-  max-width:100%;
-  margin:0 auto;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:9px 14px;
-  border:1px solid var(--line);
-  border-radius:999px;
-  background:var(--blue-soft);
-  color:var(--blue-dark);
-}
-.v310-repeater-relation [data-icon]{
-  width:16px;
-  height:16px;
-}
-.v310-repeater-relation strong{
-  font-size:11px;
-}
-.v310-repeater-relation b{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:22px;
-  height:22px;
-  padding:0 6px;
-  border-radius:999px;
-  background:#fff;
-  font-size:10px;
-}
-.v310-relay-nodes{
-  position:relative;
-  display:grid!important;
-  grid-template-columns:repeat(auto-fit,minmax(210px,1fr))!important;
-  gap:18px 12px!important;
-  padding:26px 4px 4px!important;
-}
-.v310-relay-nodes::before{
-  content:'';
-  position:absolute;
-  top:0;
-  left:8%;
-  right:8%;
-  height:2px;
-  background:var(--line);
-}
-.v310-relay-nodes .v310-relay-node{
-  position:relative;
-  min-height:66px;
-  border:1px solid var(--line)!important;
-  border-radius:12px!important;
-  background:#fff!important;
-  padding:12px 13px!important;
-  box-shadow:0 5px 16px rgba(25,58,75,.05);
-}
-.v310-relay-nodes .v310-relay-node::before{
-  content:'';
-  position:absolute;
-  width:2px;
-  height:26px;
-  left:50%;
-  top:-27px;
-  background:var(--line);
-}
-.v310-relay-nodes .v310-relay-node:hover{
-  border-color:#9dcbd6!important;
-  background:#fbfeff!important;
-}
-.v310-relay-nodes .v310-relay-node strong{
-  font-size:13px;
-}
-.v310-relay-nodes .v310-relay-node span{
-  line-height:1.45;
+.v311-repeater-branch{min-width:0}
+.v311-repeater-relay-node{
+  width:100%;
+  max-width:300px;
+  min-height:64px;
 }
 
 @media(max-width:720px){
-  .v310-communication-list-row .db-group{
-    min-width:0;
-  }
-  .v310-repeater-relationship-tree{
-    overflow:visible;
-  }
-  .v310-repeater-root{
-    min-width:0;
-    width:100%;
-  }
-  .v310-relay-nodes{
-    grid-template-columns:1fr!important;
-    gap:10px!important;
-    padding:8px 0 0 24px!important;
-    border-left:2px solid var(--line);
-  }
-  .v310-relay-nodes::before{
-    display:none;
-  }
-  .v310-relay-nodes .v310-relay-node::before{
-    width:24px;
-    height:2px;
-    left:-25px;
-    top:50%;
-  }
+  .v310-communication-list-row .db-group{min-width:0}
+  .v311-repeater-tree{padding:0}
+  .v311-repeater-tree .org-root-node{min-width:0;width:100%}
+  .v311-repeater-branches{grid-template-columns:1fr!important;gap:8px!important}
+  .v311-repeater-relay-node{max-width:none}
 }
