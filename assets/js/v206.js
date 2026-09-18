@@ -758,6 +758,9 @@
     if(typeof hydrateIcons==='function')hydrateIcons(root);
   }
 
+  /* v3.1.0: disponibiliza a ficha canônica para relações exibidas por outras frentes. */
+  globalThis.CENTRAL_OPEN_FRONT_ASSET_DETAILS = openV206FrontAssetDetails;
+
   function v206DistributionAssets() {
     const family=state.databaseV205Family||'distribution_recloser';
     return frontAssets().filter(a=>a.family_code===family&&a.active!==false).sort((a,b)=>safe(a.operating_code||a.display_name).localeCompare(safe(b.operating_code||b.display_name),'pt-BR',{numeric:true}));

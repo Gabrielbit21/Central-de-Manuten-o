@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v3.0.3
+/* Central de Manutenção SE — v3.1.0
  * Sem estilos paralelos para Integração/Substituição:
  * a entrada usa diretamente o mesmo business-front-shell da Nova Manutenção.
  */
@@ -152,7 +152,7 @@
 }
 
 
-/* ===== v3.0.3 — estabilização visual ===== */
+/* ===== v3.1.0 — estabilização visual ===== */
 /* O cartão de login fica acima do rodapé; o rodapé permanece sobre a foto, atrás do cartão. */
 .auth-shell{
   isolation:isolate;
@@ -188,5 +188,5 @@
 }
 
 
-/* ===== v3.0.3 — autenticação e estados ===== */
+/* ===== v3.1.0 — autenticação e estados ===== */
 .auth-shell .auth-build-footer.hidden{display:none!important}
