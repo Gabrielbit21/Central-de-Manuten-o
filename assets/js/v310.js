@@ -1,4 +1,4 @@
-/* Central de Manutenção SE — v3.1.1
+/* Central de Manutenção SE — v3.1.2
  * Relações visuais entre Subestações, Telecom e Religadores.
  * Camada pequena e reversível carregada por último.
  */
@@ -7,7 +7,7 @@
   if (globalThis.__CENTRAL_V310__) return;
   globalThis.__CENTRAL_V310__ = true;
 
-  const VERSION = '3.1.1';
+  const VERSION = '3.1.2';
   const safe = value => String(value ?? '');
   const norm = value => safe(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
   const esc = value => safe(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));

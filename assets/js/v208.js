@@ -150,11 +150,8 @@
     /* O submit da v205 não passa por submitMaintenance(), então a validação
        de quantidade é aplicada aqui para manter a mesma regra da Subestação. */
     form.addEventListener('submit', event => {
-      if ((state.maintenanceParticipants || []).length) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      toast('Selecione pelo menos um integrante da equipe executante.', 'warning');
-      document.getElementById('v200-team-select')?.focus();
+      if ((state.maintenanceParticipants || []).length) {if (typeof centralClearValidationTarget === 'function') centralClearValidationTarget(form.querySelector('.v200-team-field'));return;}
+      event.preventDefault();event.stopImmediatePropagation();const field=form.querySelector('.v200-team-field')||document.getElementById('v200-team-select');if (typeof centralMarkValidationTarget === 'function') centralMarkValidationTarget(field,'Selecione pelo menos um integrante da equipe executante.');toast('Selecione pelo menos um integrante da equipe executante.', 'warning');if (typeof centralScrollToValidationTarget === 'function') centralScrollToValidationTarget(field);else document.getElementById('v200-team-select')?.focus();
     }, true);
 
     form.dataset.v208Team = '1';

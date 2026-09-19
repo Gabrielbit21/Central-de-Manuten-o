@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.1.2 — 2026-09-18 — Hotfix de acesso offline e validação de formulários
+
+- corrigido o login offline em dispositivos já autorizados: o formulário não perde mais o fallback quando o bootstrap reinstala os eventos de autenticação;
+- o acesso offline passa a funcionar também quando o aparelho está conectado a uma rede, mas o Supabase está temporariamente inacessível;
+- o botão de acesso offline permanece disponível enquanto a autorização local de até 7 dias estiver válida;
+- erros de rede no login deixam de exibir apenas `Failed to fetch` quando existe uma identidade offline válida;
+- corrigida a validação de grupos obrigatórios condicionais: grupos ocultos ou desabilitados deixam de bloquear o envio do relatório;
+- campos mascarados opcionais agora limpam `setCustomValidity()` quando ficam vazios, evitando falso erro obrigatório;
+- campos e grupos inválidos recebem destaque vermelho, mensagem contextual e rolagem/foco automáticos no primeiro erro;
+- a mesma experiência de validação é aplicada aos formulários de Subestação, Distribuição e Telecom;
+- versões Web, Windows/Android e cache offline sincronizados em **3.1.2**.
+
 ## v3.1.1 — 2026-09-18 — Refinamentos das árvores e ficha canônica
 
 - ramos **Eletrônicos**, **Relés**, **Pátio** e **Comunicação** passam a abrir e retrair de forma independente na árvore da Subestação;

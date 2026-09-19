@@ -96,8 +96,8 @@ if (!v206Text.includes("const V206_VERSION = '2.0.6'")) throw new Error('v206.js
 if (!v207Text.includes("const V207_VERSION = '2.0.7'")) throw new Error('v207.js não identifica a versão 2.0.7.');
 if (!v208Text.includes("const V208_VERSION = '2.0.8'")) throw new Error('v208.js não identifica a versão 2.0.8.');
 if (!v209Text.includes("const V209_VERSION = '2.0.9'")) throw new Error('v209.js não identifica a versão 2.0.9.');
-if (!v300Text.includes("const V300_VERSION='3.1.1'")) throw new Error('v300.js não identifica a versão 3.1.1.');
-if (!v310Text.includes("const VERSION = '3.1.1'")) throw new Error('v310.js não identifica a versão 3.1.1.');
+if (!v300Text.includes("const V300_VERSION='3.1.2'")) throw new Error('v300.js não identifica a versão 3.1.2.');
+if (!v310Text.includes("const VERSION = '3.1.2'")) throw new Error('v310.js não identifica a versão 3.1.2.');
 new Function(v205PrebootText);
 new Function(v205Text);
 new Function(v206Text);
@@ -222,7 +222,7 @@ html = html.replace('</body>', `${nativeScripts}\n</body>`);
 writeFileSync(indexPath, html, 'utf8');
 writeFileSync(join(webDir, 'android-build.json'), JSON.stringify({
   token: buildToken,
-  appVersion: '3.1.1',
+  appVersion: '3.1.2',
   v205: 'enabled',
   v206: 'enabled',
   v207: 'enabled',

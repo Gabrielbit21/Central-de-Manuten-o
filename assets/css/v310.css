@@ -1,7 +1,7 @@
-/* Central de Manutenção SE — v3.1.1 */
+/* Central de Manutenção SE — v3.1.2 */
 
 /* A camada v207 tentava encaixar Telecom em tipos legados de Eletrônicos.
-   Na v3.1.1 Comunicação permanece como ramo próprio, portanto o enxerto antigo fica oculto. */
+   Na v3.1.2 Comunicação permanece como ramo próprio, portanto o enxerto antigo fica oculto. */
 .v207-telecom-tree-assets{display:none!important}
 
 /* Ramo Comunicação dentro da árvore moderna da Subestação */

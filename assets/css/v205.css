@@ -16,3 +16,11 @@
 .v205-report-tabs{margin-top:4px}.v205-report-stats{margin:-4px 0 14px}.v205-substation-communication{margin-top:16px}.v205-base-seeding{font-size:10px;color:var(--muted);margin-top:6px}
 @media(max-width:900px){.v205-db-overview,.v205-ops-fronts{grid-template-columns:1fr}.v205-review-grid{grid-template-columns:1fr}.v205-confirm{position:static}.v205-detail-grid,.v205-branch-grid,.v205-history-payload{grid-template-columns:1fr}.v205-cadastral-line{grid-template-columns:1fr}.v205-cadastral-line .arrow{display:none}.v205-review-fields{grid-template-columns:1fr}}
 @media(max-width:620px){.v205-top-tabs,.v205-family-tabs{gap:18px}.v205-page>.head-row h1{font-size:22px}.v205-summary-meta{grid-template-columns:1fr 1fr}.v205-check-grid{grid-template-columns:1fr}.v205-form-actions{flex-direction:column-reverse}.v205-form-actions .btn{width:100%}.v205-detail-head{flex-direction:column}.v205-detail-head .btn{width:100%}}
+
+/* v3.1.2 — indicação visual de campos obrigatórios / inválidos */
+.v312-invalid>label,.v312-invalid .required-mark{color:#b42318!important}
+.v312-invalid input:not([type="checkbox"]):not([type="radio"]),.v312-invalid select,.v312-invalid textarea{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.12)!important;background:#fff8f7!important}
+.v312-invalid .v205-check-grid{outline:2px solid #d92d20!important;outline-offset:4px;border-radius:8px;background:#fff8f7}
+.v312-invalid .v200-team-box{outline:2px solid #d92d20;outline-offset:3px;border-radius:10px;background:#fff8f7}
+.v312-validation-message{display:block;margin-top:6px;color:#b42318;font-size:11px;font-weight:700;line-height:1.35}
+
