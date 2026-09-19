@@ -17,10 +17,15 @@
 @media(max-width:900px){.v205-db-overview,.v205-ops-fronts{grid-template-columns:1fr}.v205-review-grid{grid-template-columns:1fr}.v205-confirm{position:static}.v205-detail-grid,.v205-branch-grid,.v205-history-payload{grid-template-columns:1fr}.v205-cadastral-line{grid-template-columns:1fr}.v205-cadastral-line .arrow{display:none}.v205-review-fields{grid-template-columns:1fr}}
 @media(max-width:620px){.v205-top-tabs,.v205-family-tabs{gap:18px}.v205-page>.head-row h1{font-size:22px}.v205-summary-meta{grid-template-columns:1fr 1fr}.v205-check-grid{grid-template-columns:1fr}.v205-form-actions{flex-direction:column-reverse}.v205-form-actions .btn{width:100%}.v205-detail-head{flex-direction:column}.v205-detail-head .btn{width:100%}}
 
-/* v3.1.2 — indicação visual de campos obrigatórios / inválidos */
+/* v3.1.3 — validação discreta, removida imediatamente após a correção */
 .v312-invalid>label,.v312-invalid .required-mark{color:#b42318!important}
-.v312-invalid input:not([type="checkbox"]):not([type="radio"]),.v312-invalid select,.v312-invalid textarea{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.12)!important;background:#fff8f7!important}
-.v312-invalid .v205-check-grid{outline:2px solid #d92d20!important;outline-offset:4px;border-radius:8px;background:#fff8f7}
-.v312-invalid .v200-team-box{outline:2px solid #d92d20;outline-offset:3px;border-radius:10px;background:#fff8f7}
-.v312-validation-message{display:block;margin-top:6px;color:#b42318;font-size:11px;font-weight:700;line-height:1.35}
-
+.v312-invalid input:not([type="checkbox"]):not([type="radio"]),.v312-invalid select,.v312-invalid textarea{border-color:#d92d20!important;box-shadow:0 0 0 1px rgba(217,45,32,.16)!important;background:#fff!important}
+.v312-invalid .v205-check-grid{border:1px solid #d92d20!important;border-radius:8px;padding:5px;background:#fff!important;outline:0!important}
+.v312-invalid .v200-team-box{border:1px solid #d92d20!important;border-radius:10px;background:#fff!important;outline:0!important;box-shadow:none!important}
+.v312-validation-message{display:block;margin-top:5px;color:#b42318;font-size:10px;font-weight:650;line-height:1.35}
+.v313-review-section{margin-top:18px}
+.v313-review-section:first-of-type{margin-top:14px}
+.v313-review-section .review-details{grid-template-columns:repeat(2,minmax(0,1fr))}
+.v313-review-wide{grid-column:1/-1}
+.v313-review-wide span{white-space:pre-wrap;line-height:1.55}
+@media(max-width:700px){.v313-review-section .review-details{grid-template-columns:1fr}}
