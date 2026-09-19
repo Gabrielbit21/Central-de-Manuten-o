@@ -1,5 +1,5 @@
-const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.1.2'}};
-const APP_VERSION='3.1.2';
+const DATA={substations:[],equipment:{},histories:{},maintenanceTypes:['Manutenção corretiva','Manutenção preventiva','Apoio em serviço de subestação'],meta:{source:'Supabase',version:'3.1.3'}};
+const APP_VERSION='3.1.3';
 const PREVENTIVE_PLAN_SEED=[];
 const main=document.getElementById('main');
 const state={screen:'home',role:localStorage.getItem('central_manutencao_role')||'admin',sub:null,selected:new Set(),pendingPhotos:[],tab:'history',folderAsset:null,reports:[],maintenanceQueue:[],queueIndex:0,queueCompleted:0,batchId:null,activeDraftId:null,activeReportNumber:null,editingRecordId:null,editingOriginal:null,reviewPayload:null,autoSaveTimer:null,syncing:false,cloudReports:[],cloudProfile:null,cloudUser:null,offlineSession:false,cloudReady:false,preventivePlan:[],preventivePlanSource:'cloud',profileDirectory:[],preventivePlanView:localStorage.getItem('central_plan_view')||'table',preventivePlanMonth:Number(localStorage.getItem('central_plan_month'))||0};
@@ -459,7 +459,7 @@ function drawOrgConnectors(host=document){
   const root=tree.querySelector('.org-root-node');if(!root)return;
   const connect=(from,to)=>{if(!from||!to)return;const a=connectorPoint(from,tree,'bottom'),b=connectorPoint(to,tree,'top'),distance=Math.max(24,b.y-a.y),curve=Math.min(70,distance*.48),path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',`M ${a.x} ${a.y} C ${a.x} ${a.y+curve}, ${b.x} ${b.y-curve}, ${b.x} ${b.y}`);svg.appendChild(path)};
   tree.querySelectorAll('.org-category-node').forEach(category=>{connect(root,category);const branch=category.closest('.org-branch');branch?.querySelectorAll(':scope .org-type-node').forEach(type=>{if(type.closest('.org-branch')===branch)connect(category,type);const typeSection=type.closest('.org-type');typeSection?.querySelectorAll(':scope .org-type-assets .org-asset-node').forEach(asset=>connect(type,asset))})});
-  /* v3.1.2: permite árvores relacionais com filhos diretos do nó raiz, como Repetidora -> Religadores. */
+  /* v3.1.3: permite árvores relacionais com filhos diretos do nó raiz, como Repetidora -> Religadores. */
   tree.querySelectorAll('.org-direct-node').forEach(node=>connect(root,node));
 }
 window.addEventListener('resize',()=>{clearTimeout(orgConnectorResizeTimer);orgConnectorResizeTimer=setTimeout(()=>drawOrgConnectors(document),120)});
@@ -697,7 +697,7 @@ function historyMatchesAsset(record,asset){if(Array.isArray(record.assetIds)&&re
 function historyForAsset(asset,subId=state.sub){if(!asset)return[];return (DATA.histories[subId]||[]).filter(record=>historyMatchesAsset(record,asset))}
 function relevantHistory(sel){const seen=new Set(),matched=[];for(const asset of sel){for(const record of historyForAsset(asset)){if(!seen.has(record.id)){seen.add(record.id);matched.push(record)}}}return matched.slice(0,40)}
 function requiredLabel(text){return `${esc(text)} <span class="required-mark" aria-hidden="true">*</span>`}
-/* v3.1.2 — validação visual consistente para formulários.
+/* v3.1.3 — validação visual consistente e revisão legível para todas as frentes.
    Só considera controles realmente ativos/visíveis e leva o usuário ao primeiro erro. */
 function centralValidationContainer(target){
   if(!target)return null;
@@ -734,8 +734,8 @@ function centralScrollToValidationTarget(target){
   setTimeout(()=>{try{focusable?.focus({preventScroll:true})}catch(_){focusable?.focus?.()}},260);
 }
 function centralInstallValidationCleanup(form){
-  if(!form||form.dataset.v312Validation==='1')return;form.dataset.v312Validation='1';
-  const clearIfResolved=event=>{const target=event.target,box=centralValidationContainer(target);if(!box?.classList.contains('v312-invalid'))return;const customGroup=box.matches?.('[data-check-required="true"]');let stillInvalid=false;if(customGroup){const controls=[...box.querySelectorAll('input[type="checkbox"],input[type="radio"]')].filter(centralValidationApplicable);stillInvalid=controls.length>0&&!controls.some(input=>input.checked)}else{const controls=[...box.querySelectorAll('input,select,textarea')].filter(control=>centralValidationApplicable(control)&&control.willValidate);stillInvalid=controls.some(control=>!control.validity.valid)}if(!stillInvalid)centralClearValidationTarget(box)};
+  if(!form||form.dataset.v313Validation==='1')return;form.dataset.v313Validation='1';
+  const clearIfResolved=event=>{const target=event.target,box=centralValidationContainer(target);if(!box?.classList.contains('v312-invalid'))return;requestAnimationFrame(()=>{const customGroup=box.matches?.('[data-check-required=\"true\"]');let stillInvalid=false;if(customGroup){const controls=[...box.querySelectorAll('input[type=\"checkbox\"],input[type=\"radio\"]')].filter(centralValidationApplicable);stillInvalid=controls.length>0&&!controls.some(input=>input.checked)}else{const controls=[...box.querySelectorAll('input,select,textarea')].filter(control=>centralValidationApplicable(control)&&control.willValidate);stillInvalid=controls.some(control=>!control.validity.valid)}if(!stillInvalid)centralClearValidationTarget(box)})};
   form.addEventListener('input',clearIfResolved);form.addEventListener('change',clearIfResolved);
 }
 function centralValidateForm(form,{checkGroups=true}={}){
@@ -743,6 +743,47 @@ function centralValidateForm(form,{checkGroups=true}={}){
   [...form.elements].forEach(control=>{if(!centralValidationApplicable(control)||!control.willValidate||control.validity.valid)return;const message=control.validity.valueMissing?'Este campo é obrigatório.':(control.validationMessage||'Revise este campo.');centralMarkValidationTarget(control,message);invalid.push(control)});
   if(checkGroups)form.querySelectorAll('[data-check-required="true"]').forEach(group=>{if(group.closest('[hidden],.hidden'))return;const controls=[...group.querySelectorAll('input[type="checkbox"],input[type="radio"]')].filter(centralValidationApplicable);if(!controls.length||controls.some(input=>input.checked))return;centralMarkValidationTarget(group,'Selecione pelo menos uma opção.');invalid.push(group)});
   if(!invalid.length)return true;toast(`Revise ${invalid.length} campo(s) obrigatório(s) destacado(s).`,'warning');centralScrollToValidationTarget(invalid[0]);return false;
+}
+
+const CENTRAL_REVIEW_EXCLUDED_FIELDS=new Set(['participantIds','assetChangesJson','inconclusivo']);
+function centralReviewCleanLabel(value){return String(value||'').replace(/\s*\*\s*$/,'').replace(/\s+/g,' ').trim()}
+function centralReviewSectionTitle(control){
+  const section=control.closest?.('.v205-form-section,.dynamic-section,.conclusion-card,.piece-section');
+  if(section?.classList?.contains('conclusion-card'))return 'Encerramento do atendimento';
+  const heading=section?.querySelector?.('.v205-section-title h3,.dynamic-section-head h3,h3');
+  return centralReviewCleanLabel(heading?.textContent)||'Dados do atendimento';
+}
+function centralReviewControlLabel(control){
+  if(control.name==='equipe')return 'Equipe técnica responsável';
+  if(control.name==='v207ActivityType')return 'Tipo de manutenção';
+  if(/^shelterCheck_|^towerCheck_/.test(control.name||''))return centralReviewCleanLabel(String(control.getAttribute('aria-label')||'').split(' — ')[0]);
+  const field=control.closest?.('.field,.v205-check-field,.v200-team-field');
+  const direct=field?.querySelector?.(':scope > label');if(direct)return centralReviewCleanLabel(direct.textContent);
+  const id=control.id,byFor=id?control.form?.querySelector?.(`label[for="${CSS.escape(id)}"]`):null;if(byFor)return centralReviewCleanLabel(byFor.textContent);
+  return FORM_LABELS?.[control.name]||centralReviewCleanLabel(control.name);
+}
+function centralReviewDisplayValue(name,value){
+  if(Array.isArray(value))return value.filter(Boolean).join(', ');
+  if(name==='data'&&value)return formatDate(value);
+  return String(value??'').trim();
+}
+function centralBuildReviewSections(form,values={}){
+  if(!form)return[];const order=[],groups=new Map(),handled=new Set(),controls=[...form.querySelectorAll('input[name],select[name],textarea[name]')];
+  const add=(section,label,value,name)=>{value=centralReviewDisplayValue(name,value);if(!value)return;const key=section||'Dados do atendimento';if(!groups.has(key)){groups.set(key,[]);order.push(key)}groups.get(key).push({label,value,name})};
+  for(let control of controls){const name=control.name;if(!name||handled.has(name)||CENTRAL_REVIEW_EXCLUDED_FIELDS.has(name)||control.type==='file'||control.disabled||control.closest('[hidden],.hidden'))continue;
+    if(control.type==='hidden'&&name!=='equipe')continue;
+    const same=controls.filter(item=>item.name===name&&!item.disabled&&!item.closest('[hidden],.hidden'));
+    let value='';
+    if(control.type==='radio'){const checked=same.find(item=>item.checked);if(!checked){handled.add(name);continue}value=checked.value;control=checked}
+    else if(control.type==='checkbox'){const checked=same.filter(item=>item.checked);if(!checked.length){handled.add(name);continue}value=checked.map(item=>item.value||'Sim')}
+    else value=values[name]!==undefined?values[name]:control.value;
+    const label=centralReviewControlLabel(control);if(!label){handled.add(name);continue}add(centralReviewSectionTitle(control),label,value,name);handled.add(name)
+  }
+  if(values.resultadoAtendimento)add('Encerramento do atendimento','Resultado do atendimento',values.resultadoAtendimento,'resultadoAtendimento');
+  return order.map(title=>({title,items:groups.get(title)})).filter(section=>section.items.length);
+}
+function centralReviewSectionsMarkup(sections=[]){
+  return sections.map(section=>`<div class="review-section v313-review-section"><h3>${esc(section.title)}</h3><div class="review-details">${section.items.map(item=>`<div class="review-detail ${String(item.value).length>100?'v313-review-wide':''}"><b>${esc(item.label)}</b><span>${esc(item.value)}</span></div>`).join('')}</div></div>`).join('');
 }
 
 function setFormValues(form,values={}){Object.entries(values||{}).forEach(([k,v])=>{const el=form.elements[k];if(!el)return;if(el instanceof RadioNodeList){return}if(el.type==='checkbox')el.checked=normalize(v)==='sim'||v===true||v==='on';else el.value=v??''})}
@@ -807,8 +848,8 @@ renderActivity=async function(){await _baseRenderActivity();const form=document.
 
 function reviewRows(form){const primary=['data','tipo','os','equipe','inicio','fim','resultadoAtendimento','houvePeca'];return primary.filter(k=>form[k]).map(k=>[FORM_LABELS[k]||k,k==='data'?formatDate(form[k]):form[k]])}
 function reviewBlocks(form){const keys=['defeito','causa','reparo','arquiteturaAtualizada','projetoAtualizado','configuracaoRealizada','configuracao','ajusteProtecao','peca','destinoPeca','comentarios','motivoInconclusao','retorno','justificativaAlteracao'];return keys.filter(k=>form[k]&&normalize(form[k])!=='nao se aplica').map(k=>[FORM_LABELS[k]||k,form[k]])}
-async function renderSubmissionReview(){const payload=state.reviewPayload;if(!payload)return renderActivity();state.screen='submission-review';const s=currentSub(),asset=payload.sel[0],rows=reviewRows(payload.formData),blocks=reviewBlocks(payload.formData),offline=!navigator.onLine;main.innerHTML=`${steps(4)}<section class="submission-review"><div class="review-hero"><div><button class="back" id="review-back" type="button" aria-label="Voltar ao formulário" title="Voltar ao formulário"><span data-icon="arrow-left"></span></button><h2>Revisar relatório</h2><p class="muted">Confira todos os dados antes de registrar. Após a confirmação, qualquer correção será auditada.</p></div></div><div class="review-layout"><section class="panel"><div class="review-section"><h3>Ativo e subestação</h3><div class="review-details"><div class="review-detail"><b>Subestação</b><span>${esc(s.sigla)} — ${esc(s.nome)}</span></div><div class="review-detail"><b>Ativo</b><span>${esc(assetTitle(asset))}</span></div><div class="review-detail"><b>Categoria</b><span>${esc(asset.grupo||'Não informada')}</span></div><div class="review-detail"><b>Circuito</b><span>${esc(assetCircuit(asset)||'Não informado')}</span></div></div></div><div class="review-section"><h3>Dados do atendimento</h3><div class="review-details">${rows.map(([k,v])=>`<div class="review-detail"><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')}</div>${blocks.map(([k,v])=>`<div class="review-text"><b>${esc(k)}</b><p>${esc(v)}</p></div>`).join('')}</div><div class="review-section"><h3>Imagens</h3>${state.pendingPhotos.length?`<div class="review-photo-grid">${state.pendingPhotos.map(p=>`<img src="${blobUrl(p.blob)}" alt="${esc(p.category||'Imagem')}">`).join('')}</div><p class="validation-note">${state.pendingPhotos.length} imagem(ns) será(ão) vinculada(s) a este ativo.</p>`:'<div class="empty">Nenhuma imagem adicionada.</div>'}</div></section><aside class="panel confirm-send">${offline?'<div class="offline-review"><b>Dispositivo offline.</b><br>O relatório será guardado na fila e enviado automaticamente quando a internet e a conexão com a nuvem estiverem disponíveis.</div>':''}${!cloudConfigured()?'<div class="cloud-required"><b>Nuvem ainda não configurada.</b><br>O relatório ficará protegido no dispositivo e marcado para envio. A integração será ativada após a criação do ambiente em nuvem.</div>':''}<h3 style="margin-top:0">Confirmação</h3><label class="confirm-box"><input id="confirm-review" type="checkbox"><span><strong>Revisei os dados acima</strong></span></label><div style="display:grid;gap:8px"><button class="btn primary" id="confirm-submit" disabled>${state.editingRecordId?'Confirmar correção':'Confirmar e registrar'}</button><button class="btn secondary" id="review-back-bottom">Voltar e corrigir</button></div></aside></div></section>`;const checkbox=document.getElementById('confirm-review'),button=document.getElementById('confirm-submit');checkbox.onchange=()=>button.disabled=!checkbox.checked;document.getElementById('review-back').onclick=document.getElementById('review-back-bottom').onclick=()=>{state.screen='activity';renderActivity()};button.onclick=finalizeReviewedMaintenance}
-submitMaintenance=async function(ev,form,sel){ev.preventDefault();if(!centralValidateForm(form))return;const draft=await saveDraft(form,{silent:true});state.reviewPayload={formData:formSnapshot(form),sel,reportNumber:draft?.reportNumber||ensureReportNumber(),draftId:draft?.id||currentDraftId(),editingRecordId:state.editingRecordId};await renderSubmissionReview()};
+async function renderSubmissionReview(){const payload=state.reviewPayload;if(!payload)return renderActivity();state.screen='submission-review';const s=currentSub(),asset=payload.sel[0],reviewSections=payload.reviewSections||[],offline=!navigator.onLine;main.innerHTML=`${steps(4)}<section class="submission-review"><div class="review-hero"><div><button class="back" id="review-back" type="button" aria-label="Voltar ao formulário" title="Voltar ao formulário"><span data-icon="arrow-left"></span></button><h2>Revisar relatório</h2><p class="muted">Confira todos os dados antes de registrar. Após a confirmação, qualquer correção será auditada.</p></div></div><div class="review-layout"><section class="panel"><div class="review-section"><h3>Ativo e subestação</h3><div class="review-details"><div class="review-detail"><b>Subestação</b><span>${esc(s.sigla)} — ${esc(s.nome)}</span></div><div class="review-detail"><b>Ativo</b><span>${esc(assetTitle(asset))}</span></div><div class="review-detail"><b>Categoria</b><span>${esc(asset.grupo||'Não informada')}</span></div><div class="review-detail"><b>Circuito</b><span>${esc(assetCircuit(asset)||'Não informado')}</span></div></div></div>${centralReviewSectionsMarkup(reviewSections)}<div class="review-section"><h3>Imagens</h3>${state.pendingPhotos.length?`<div class="review-photo-grid">${state.pendingPhotos.map(p=>`<img src="${blobUrl(p.blob)}" alt="${esc(p.category||'Imagem')}">`).join('')}</div><p class="validation-note">${state.pendingPhotos.length} imagem(ns) será(ão) vinculada(s) a este ativo.</p>`:'<div class="empty">Nenhuma imagem adicionada.</div>'}</div></section><aside class="panel confirm-send">${offline?'<div class="offline-review"><b>Dispositivo offline.</b><br>O relatório será guardado na fila e enviado automaticamente quando a internet e a conexão com a nuvem estiverem disponíveis.</div>':''}${!cloudConfigured()?'<div class="cloud-required"><b>Nuvem ainda não configurada.</b><br>O relatório ficará protegido no dispositivo e marcado para envio. A integração será ativada após a criação do ambiente em nuvem.</div>':''}<h3 style="margin-top:0">Confirmação</h3><label class="confirm-box"><input id="confirm-review" type="checkbox"><span><strong>Revisei os dados acima</strong></span></label><div style="display:grid;gap:8px"><button class="btn primary" id="confirm-submit" disabled>${state.editingRecordId?'Confirmar correção':'Confirmar e registrar'}</button><button class="btn secondary" id="review-back-bottom">Voltar e corrigir</button></div></aside></div></section>`;const checkbox=document.getElementById('confirm-review'),button=document.getElementById('confirm-submit');checkbox.onchange=()=>button.disabled=!checkbox.checked;document.getElementById('review-back').onclick=document.getElementById('review-back-bottom').onclick=()=>{state.screen='activity';renderActivity()};button.onclick=finalizeReviewedMaintenance}
+submitMaintenance=async function(ev,form,sel){ev.preventDefault();if(!centralValidateForm(form))return;const formData=formSnapshot(form),reviewSections=centralBuildReviewSections(form,formData),draft=await saveDraft(form,{silent:true});state.reviewPayload={formData,reviewSections,sel,reportNumber:draft?.reportNumber||ensureReportNumber(),draftId:draft?.id||currentDraftId(),editingRecordId:state.editingRecordId};await renderSubmissionReview()};
 
 async function persistPendingPhotos(recordId,sel,createdAt){for(let i=0;i<state.pendingPhotos.length;i++){const p=state.pendingPhotos[i],assetIds=p.assetId==='all'?sel.map(e=>e.id):[p.assetId];for(const assetId of assetIds){const photoId=`${recordId}_${assetId}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,6)}`;await idbPut('maintenancePhotos',{id:photoId,maintenanceId:recordId,assetId,blob:p.blob,category:p.category,caption:p.caption,criadoEm:createdAt});if(p.asProfile&&p.assetId!=='all')await idbPut('assetPhotos',{assetId,blob:p.blob,updatedAt:createdAt})}}}
 function initialLocalStatus(){if(!navigator.onLine)return 'aguardando_envio';return cloudConfigured()?'aguardando_envio':'aguardando_nuvem'}
@@ -844,7 +885,7 @@ function assertLocalRuntimeDependencies(){
   const missing=[];
   if(!globalThis.supabase?.createClient)missing.push('Supabase JS local');
   if(!globalThis.XLSX?.utils)missing.push('SheetJS local');
-  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.1.2.`);
+  if(missing.length)throw new Error(`Dependências locais ausentes: ${missing.join(', ')}. Execute PREPARAR_RELEASE.bat antes de publicar/instalar a v3.1.3.`);
 }
 assertLocalRuntimeDependencies();
 window.CENTRAL_CLOUD_CONFIG={enabled:true,supabaseUrl:'https://szshskfyocsumvmqwuem.supabase.co',supabasePublishableKey:'sb_publishable_2gLFPNZzZtjdA4XKOKWvhw_lnecGM8L'};
@@ -880,7 +921,7 @@ function isValidAccountEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Str
 function showAuthTab(name){if(name==='verify'&&!pendingVerificationEmail)name='signup';const activeTab=(name==='verify'||name==='invite')?'signup':name;document.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active',b.dataset.authTab===activeTab));document.querySelectorAll('[data-auth-pane]').forEach(p=>p.classList.toggle('active',p.dataset.authPane===name));const authFooter=document.querySelector('#auth-shell .auth-build-footer');if(authFooter)authFooter.classList.toggle('hidden',name!=='login');if(name==='verify'){document.getElementById('verify-email-target').textContent=pendingVerificationEmail||'Informe o e-mail na etapa anterior'}authMessage('')}
 function showCloudLoading(show,text='Sincronizando a base…'){const el=document.getElementById('cloud-loading');if(!el)return;el.classList.toggle('hidden',!show);const strong=el.querySelector('strong');if(strong)strong.textContent=text}
 function cachedIdentity(){try{return JSON.parse(localStorage.getItem('central_offline_identity')||'null')}catch{return null}}
-function storeIdentity(user,profile){const safeProfile={id:profile?.id||user.id,display_name:profile?.display_name||user.email||'Usuário',role:profile?.role==='admin'?'admin':'field',active:profile?.active!==false,avatar_path:profile?.avatar_path||null,approval_status:'approved',must_change_password:false};localStorage.setItem('central_offline_identity',JSON.stringify({user:{id:user.id,email:user.email},profile:safeProfile,authenticatedAt:new Date().toISOString()}))}
+function storeIdentity(user,profile){const previous=cachedIdentity?.()||{};const safeProfile={id:profile?.id||user.id,display_name:profile?.display_name||user.email||'Usuário',role:profile?.role==='admin'?'admin':'field',active:profile?.active!==false,avatar_path:profile?.avatar_path||null,approval_status:'approved',must_change_password:false};localStorage.setItem('central_offline_identity',JSON.stringify({user:{id:user.id,email:user.email},profile:safeProfile,authenticatedAt:new Date().toISOString(),offlineCredential:previous?.offlineCredential||null,validatedAt:previous?.validatedAt||null}))}
 
 async function paginatedSelect(table,columns='*',orderColumn='id'){
   const pageSize=1000,all=[];let from=0;
@@ -951,15 +992,74 @@ setAssetPhoto=async function(assetId,file){const blob=await _localSetAssetPhoto(
 const _localPhotoForAsset=photoForAsset;
 photoForAsset=async function(assetId){const local=await _localPhotoForAsset(assetId);if(local)return local;let asset;for(const sub of Object.values(DATA.equipment)){asset=[...(sub.eletronicos||[]),...(sub.reles||[]),...(sub.patio||[])].find(a=>a.id===assetId);if(asset)break}if(!asset?.profilePhotoPath||!navigator.onLine)return null;const {data,error}=await cloudClient.storage.from('asset-profile-photos').download(asset.profilePhotoPath);if(error)return null;await idbPut('assetPhotos',{assetId,blob:data,updatedAt:new Date().toISOString()});return data};
 
-/* v3.1.2 — o acesso offline não depende apenas de navigator.onLine.
-   Uma rede pode estar conectada e ainda assim não alcançar o Supabase. */
+/* v3.1.3 — autenticação explícita em qualquer modo.
+   O aplicativo nunca entra somente por encontrar uma sessão/cache local.
+   Online: e-mail + senha são validados no Supabase.
+   Offline: e-mail + senha são validados por um verificador PBKDF2 local,
+   criado somente após um login online bem-sucedido neste dispositivo. */
+const OFFLINE_CREDENTIAL_VERSION=1;
+const OFFLINE_PBKDF2_ITERATIONS=350000;
+let centralLoginForcedOffline=false;
 function isNetworkLikeAuthError(error){return /failed to fetch|network|load failed|networkerror|fetch|connection|internet|offline/i.test(String(error?.message||error||''))}
-function validOfflineIdentity(email=''){const cached=cachedIdentity();if(!cached||!dailySessionValid())return null;if(email&&normalize(cached.user?.email)!==normalize(email))return null;return cached}
-function showOfflineLoginOption(cached=validOfflineIdentity()){
-  const box=document.getElementById('offline-login');if(!box)return false;
-  if(!cached){box.classList.add('hidden');box.innerHTML='';return false}
-  box.classList.remove('hidden');box.innerHTML=`<button class="btn secondary" id="open-offline" style="width:100%">Acessar offline como ${esc(cached.profile?.display_name||cached.user?.email||'usuário')}</button><p class="muted" style="font-size:10px;text-align:center">Autorização offline válida neste dispositivo por até 7 dias após o último acesso online.</p>`;document.getElementById('open-offline').onclick=()=>enterApplication(cached.user,cached.profile,{offline:true});return true;
+function validOfflineIdentity(email=''){const cached=cachedIdentity();if(!cached||!dailySessionValid())return null;if(email&&normalize(cached.user?.email)!==normalize(email))return null;if(cached.profile?.active===false)return null;return cached}
+function centralBytesToBase64(bytes){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary)}
+function centralBase64ToBytes(value){const binary=atob(String(value||''));return Uint8Array.from(binary,ch=>ch.charCodeAt(0))}
+async function centralOfflineDigest(password,saltBase64,iterations=OFFLINE_PBKDF2_ITERATIONS){
+  if(!globalThis.crypto?.subtle)throw new Error('Este dispositivo não oferece o recurso criptográfico necessário para o acesso offline.');
+  const encoder=new TextEncoder(),key=await crypto.subtle.importKey('raw',encoder.encode(String(password||'')),{name:'PBKDF2'},false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:centralBase64ToBytes(saltBase64),iterations:Number(iterations)||OFFLINE_PBKDF2_ITERATIONS},key,256);
+  return centralBytesToBase64(new Uint8Array(bits));
 }
+function centralConstantTimeTextEqual(a,b){const aa=String(a||''),bb=String(b||'');let diff=aa.length^bb.length,max=Math.max(aa.length,bb.length);for(let i=0;i<max;i++)diff|=(aa.charCodeAt(i)||0)^(bb.charCodeAt(i)||0);return diff===0}
+async function centralEnrollOfflineCredential(email,password){
+  const cached=cachedIdentity();if(!cached||normalize(cached.user?.email)!==normalize(email))return false;
+  const saltBytes=new Uint8Array(16);crypto.getRandomValues(saltBytes);const salt=centralBytesToBase64(saltBytes),hash=await centralOfflineDigest(password,salt,OFFLINE_PBKDF2_ITERATIONS),stamp=new Date().toISOString();
+  localStorage.setItem('central_offline_identity',JSON.stringify({...cached,validatedAt:stamp,authenticatedAt:stamp,offlineCredential:{version:OFFLINE_CREDENTIAL_VERSION,algorithm:'PBKDF2-SHA-256',iterations:OFFLINE_PBKDF2_ITERATIONS,salt,hash}}));return true;
+}
+async function centralVerifyOfflineCredential(email,password){
+  const cached=validOfflineIdentity(email);if(!cached)return {ok:false,reason:'not-authorized'};
+  const credential=cached.offlineCredential;if(!credential?.salt||!credential?.hash)return {ok:false,reason:'not-enrolled',cached};
+  try{const hash=await centralOfflineDigest(password,credential.salt,credential.iterations);return {ok:centralConstantTimeTextEqual(hash,credential.hash),reason:'credentials',cached}}catch(error){return {ok:false,reason:'crypto',cached,error}}
+}
+function syncLoginConnectivityUi(forceOffline=centralLoginForcedOffline||!navigator.onLine){
+  const onlineButton=document.getElementById('online-login-submit'),offlineButton=document.getElementById('offline-login-submit');if(!onlineButton||!offlineButton)return;
+  onlineButton.classList.toggle('hidden',!!forceOffline);offlineButton.classList.toggle('hidden',!forceOffline);
+}
+function centralSetLoginOfflineMode(value){centralLoginForcedOffline=!!value;syncLoginConnectivityUi()}
+function centralSetButtonBusy(button,busy,label){if(!button)return;if(!button.dataset.label)button.dataset.label=button.textContent;button.disabled=busy;button.textContent=busy?label:button.dataset.label}
+function installCanonicalLoginHandlers(){
+  const login=document.getElementById('login-form'),offlineButton=document.getElementById('offline-login-submit');if(!login||!offlineButton)return;
+  syncLoginConnectivityUi();
+  login.onsubmit=async e=>{
+    e.preventDefault();const fd=new FormData(login),email=String(fd.get('email')||'').trim(),password=String(fd.get('password')||'');authMessage('');
+    if(!navigator.onLine||centralLoginForcedOffline){centralSetLoginOfflineMode(true);return}
+    setAuthBusy(login,true,'Entrando…');
+    try{
+      const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;
+      const profile=await fetchCurrentProfile(data.user);state.offlineSession=false;markDailySession();await enterApplication(data.user,profile);if(!document.getElementById('app-shell')?.classList.contains('hidden'))await centralEnrollOfflineCredential(email,password);
+    }catch(error){
+      if(isNetworkLikeAuthError(error)){centralSetLoginOfflineMode(true);authMessage('Sem conexão com o servidor. Use Entrar offline com seu e-mail e senha.','error')}
+      else authMessage(error?.message==='Invalid login credentials'?'E-mail ou senha inválidos.':(error?.message||String(error)),'error');
+    }finally{setAuthBusy(login,false)}
+  };
+  offlineButton.onclick=async()=>{
+    const fd=new FormData(login),email=String(fd.get('email')||'').trim(),password=String(fd.get('password')||'');authMessage('');
+    if(!email||!password){authMessage('Informe seu e-mail e senha.','error');return}
+    centralSetButtonBusy(offlineButton,true,'Validando…');
+    try{
+      const result=await centralVerifyOfflineCredential(email,password);
+      if(!result.ok){
+        if(result.reason==='not-enrolled')throw new Error('Faça um login online neste dispositivo para habilitar o acesso offline com senha.');
+        if(result.reason==='not-authorized')throw new Error('Este usuário não possui autorização offline válida neste dispositivo.');
+        if(result.reason==='crypto')throw result.error||new Error('Não foi possível validar a credencial offline.');
+        throw new Error('E-mail ou senha inválidos.');
+      }
+      await enterApplication(result.cached.user,result.cached.profile,{offline:true});
+    }catch(error){authMessage(error?.message||String(error),'error')}finally{centralSetButtonBusy(offlineButton,false)}
+  };
+}
+window.addEventListener('offline',()=>centralSetLoginOfflineMode(true));
+window.addEventListener('online',()=>centralSetLoginOfflineMode(false));
 
 function setupAuthUI(){
   document.querySelectorAll('[data-auth-tab]').forEach(b=>b.onclick=()=>showAuthTab(b.dataset.authTab));
@@ -968,22 +1068,7 @@ function setupAuthUI(){
   const updateResendButton=()=>{const b=document.getElementById('resend-code');if(!b)return;const left=Math.max(0,Math.ceil((resendUntil-Date.now())/1000));b.disabled=left>0;b.textContent=left>0?`Reenviar código em ${left}s`:'Reenviar código';if(!left&&resendTimer){clearInterval(resendTimer);resendTimer=null}};
   const startResendCooldown=(seconds=60)=>{resendUntil=Date.now()+seconds*1000;updateResendButton();if(resendTimer)clearInterval(resendTimer);resendTimer=setInterval(updateResendButton,1000)};
   const login=document.getElementById('login-form');
-  showOfflineLoginOption();
-  login.onsubmit=async e=>{
-    e.preventDefault();
-    const fd=new FormData(login),email=String(fd.get('email')).trim(),password=String(fd.get('password'));
-    setAuthBusy(login,true,'Entrando…');authMessage('');
-    try{
-      const offline=validOfflineIdentity(email);
-      if(!navigator.onLine){if(offline){await enterApplication(offline.user,offline.profile,{offline:true});return}throw new TypeError('offline')}
-      const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;
-      try{const profile=await fetchCurrentProfile(data.user);markDailySession();await enterApplication(data.user,profile)}catch(accessError){if(!isNetworkLikeAuthError(accessError))await cloudClient.auth.signOut().catch(()=>{});throw accessError}
-    }catch(error){
-      const offline=validOfflineIdentity(email);
-      if(offline&&(!navigator.onLine||isNetworkLikeAuthError(error))){authMessage('');await enterApplication(offline.user,offline.profile,{offline:true});return}
-      authMessage(error?.message==='Invalid login credentials'?'E-mail ou senha inválidos.':(!navigator.onLine||isNetworkLikeAuthError(error))?'Sem conexão com o servidor. Faça um acesso online ao menos uma vez neste dispositivo ou use o acesso offline disponível.':(error?.message||String(error)),'error');showOfflineLoginOption();
-    }finally{setAuthBusy(login,false)}
-  };
+  installCanonicalLoginHandlers();
   const signup=document.getElementById('signup-form');
   signup.onsubmit=async e=>{
     e.preventDefault();
@@ -1054,19 +1139,11 @@ function setupInviteFallbackUI(){
 
 async function bootConnectedApp(){
   setupAuthUI();setupInviteFallbackUI();
+  document.getElementById('app-shell')?.classList.add('hidden');document.getElementById('auth-shell')?.classList.remove('hidden');
   if(!cloudClient)return authMessage('Não foi possível carregar a biblioteca de conexão. Verifique a internet e recarregue.','error');
-  let offline=validOfflineIdentity();
-  if(!dailySessionValid()){localStorage.removeItem('central_offline_identity');offline=null;if(navigator.onLine)await cloudClient.auth.signOut().catch(()=>{})}else{showOfflineLoginOption(offline)}
-  if(navigator.onLine){
-    try{
-      const {data,error}=await cloudClient.auth.getSession();if(error)throw error;
-      if(data.session){if(!dailySessionValid()){await cloudClient.auth.signOut().catch(()=>{});showAuthTab('login');return authMessage('Sua autorização offline expirou. Entre novamente com internet para renovar este dispositivo.','info')}return await startFromSession(data.session)}
-    }catch(error){
-      if(isNetworkLikeAuthError(error)&&offline){showAuthTab('login');showOfflineLoginOption(offline);authMessage('Servidor indisponível no momento. O acesso offline deste dispositivo continua disponível.','info')}else{await cloudClient.auth.signOut().catch(()=>{});authMessage(error?.message||String(error),'error')}
-    }
-  }
-  showAuthTab(pendingVerificationEmail?'verify':'login');showOfflineLoginOption(validOfflineIdentity());
-  cloudClient.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'){document.getElementById('app-shell').classList.add('hidden');document.getElementById('auth-shell').classList.remove('hidden');showOfflineLoginOption(validOfflineIdentity())}})
+  if(!dailySessionValid())localStorage.removeItem('central_offline_identity');
+  showAuthTab(pendingVerificationEmail?'verify':'login');centralSetLoginOfflineMode(!navigator.onLine);
+  cloudClient.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'){document.getElementById('app-shell')?.classList.add('hidden');document.getElementById('auth-shell')?.classList.remove('hidden');showAuthTab('login');centralSetLoginOfflineMode(!navigator.onLine)}})
 }
 
 
@@ -1919,8 +1996,8 @@ async function reconcilePushRegistrationSilently(){
   try{const sub=await currentPushSubscription();if(sub)await savePushSubscription(sub)}catch(error){console.warn('Ressincronização Push:',error)}
 }
 const _v120EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.2';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
-const APP_BUILD='3.1.2';
+enterApplication=async function(...args){await _v120EnterApplication(...args);const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.3';setTimeout(()=>reconcilePushRegistrationSilently(),300)};
+const APP_BUILD='3.1.3';
 async function ensureCurrentBuild(){
   try{
     const response=await fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'});
@@ -2001,7 +2078,7 @@ renderHome=async function(){await _v140RenderHome();await enhanceSmartHome()};
 const _v140EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v140EnterApplication(...args);
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.2';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.3';
 };
 
 
@@ -2251,7 +2328,7 @@ function injectDatabaseExportAction(){
 const _v150RenderDatabase=renderDatabase;
 renderDatabase=async function(){await _v150RenderDatabase();injectDatabaseExportAction()};
 const _v150EnterApplication=enterApplication;
-enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.2';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.2'};
+enterApplication=async function(...args){await _v150EnterApplication(...args);const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.3';const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.3'};
 
 
 /* ===== v1.9.0 — ajustes comportamentais consolidados ===== */
@@ -2343,8 +2420,8 @@ openNotificationCenter=async function(){await _v170OpenNotifications();hydrateIc
 const _v170EnterApplication=enterApplication;
 enterApplication=async function(...args){
   await _v170EnterApplication(...args);
-  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.2';
-  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.2';
+  const version=document.getElementById('app-version-label');if(version)version.textContent='v3.1.3';
+  const footerVersion=document.getElementById('environment-footer-version');if(footerVersion)footerVersion.textContent='v3.1.3';
   const bell=document.getElementById('notification-bell');if(bell){bell.innerHTML='<span data-icon="bell"></span><span class="notification-bell-count hidden" id="notification-bell-count">0</span>';bell.onclick=openNotificationCenter;hydrateIcons(bell)}
   requestAnimationFrame(syncAdaptiveHeader);
 };

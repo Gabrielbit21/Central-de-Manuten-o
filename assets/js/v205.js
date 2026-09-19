@@ -129,33 +129,17 @@
   storeIdentity=function(user,profile){
     const previous=cachedIdentity?.();baseStoreIdentity(user,profile);const current=cachedIdentity?.()||{};
     const validatedAt=(navigator.onLine&&!state.offlineSession)?nowIso():(previous?.validatedAt||previous?.authenticatedAt||current.authenticatedAt);
-    localStorage.setItem('central_offline_identity',JSON.stringify({...current,validatedAt,authenticatedAt:validatedAt}));
+    localStorage.setItem('central_offline_identity',JSON.stringify({...current,offlineCredential:previous?.offlineCredential||current?.offlineCredential||null,validatedAt,authenticatedAt:validatedAt}));
   };
   markDailySession=function(){const c=cachedIdentity?.();if(c){const stamp=nowIso();localStorage.setItem('central_offline_identity',JSON.stringify({...c,validatedAt:stamp,authenticatedAt:stamp}))}localStorage.setItem('central_daily_session_day',dailySessionDay())};
   dailySessionValid=function(){return cachedValidation().valid};
   enforceDailySessionBoundary=async function(){
     const {valid}=cachedValidation();if((state.cloudUser||cachedIdentity?.())&&!valid){await preserveCurrentDraftBeforeDailyLogout?.();state.cloudUser=null;state.cloudProfile=null;state.cloudReports=[];state.offlineSession=false;document.getElementById('app-shell')?.classList.add('hidden');document.getElementById('auth-shell')?.classList.remove('hidden');showAuthTab('login');authMessage('Conecte-se à internet para renovar a autorização deste dispositivo.','info')}
   };
-  function showOfflineAccess(){
-    const {cached,valid}=cachedValidation(),box=document.getElementById('offline-login');if(!box||!cached||!valid)return false;
-    box.classList.remove('hidden');box.innerHTML=`<button class="btn secondary" id="open-offline" style="width:100%">Acessar offline como ${esc(cached.profile?.display_name||cached.user?.email||'usuário')}</button>`;
-    document.getElementById('open-offline').onclick=()=>enterApplication(cached.user,cached.profile,{offline:true});return true;
-  }
+  function showOfflineAccess(){if(typeof syncLoginConnectivityUi==='function')syncLoginConnectivityUi();return false}
   function networkLikeError(error){return /failed to fetch|network|load failed|networkerror|fetch/i.test(String(error?.message||error||''))}
-  function patchLoginFallback(){
-    showOfflineAccess();const login=document.getElementById('login-form');if(!login||login.dataset.v205==='1')return;login.dataset.v205='1';
-    login.onsubmit=async e=>{
-      e.preventDefault();const fd=new FormData(login),email=String(fd.get('email')||'').trim();setAuthBusy(login,true,'Entrando…');authMessage('');
-      try{
-        if(!navigator.onLine)throw new TypeError('offline');
-        const {data,error}=await cloudClient.auth.signInWithPassword({email,password:String(fd.get('password')||'')});if(error)throw error;
-        const profile=await fetchCurrentProfile(data.user);state.offlineSession=false;markDailySession();await enterApplication(data.user,profile);
-      }catch(error){
-        const {cached,valid}=cachedValidation();if((!navigator.onLine||networkLikeError(error))&&cached&&valid&&norm(cached.user?.email)===norm(email)){authMessage('');return enterApplication(cached.user,cached.profile,{offline:true})}
-        authMessage(error?.message==='Invalid login credentials'?'E-mail ou senha inválidos.':(!navigator.onLine||networkLikeError(error))?'Sem conexão disponível. Faça um acesso online ao menos uma vez neste dispositivo.':(error?.message||String(error)),'error');
-      }finally{setAuthBusy(login,false)}
-    };
-  }
+  function patchLoginFallback(){if(typeof syncLoginConnectivityUi==='function')syncLoginConnectivityUi()}
+
 
   const baseLoadCloudSnapshot=loadCloudSnapshot;
   loadCloudSnapshot=async function(...args){const result=await baseLoadCloudSnapshot(...args);await loadV205FrontAssets();await loadV205History();return result};
@@ -571,12 +555,13 @@
     hydrateIcons(main);const form=document.getElementById('v205-form');form.elements.data.value=new Date().toISOString().slice(0,10);bindV205Dynamics(form);bindCadastral(form,asset,'front_assets');bindV205Photos(form,asset);
     document.getElementById('v205-back-activity').onclick=()=>renderV205ActivityChoice(asset);
     document.getElementById('v205-save-draft').onclick=async()=>{form.querySelector('.v205-cadastral')?._v205Sync?.();const draft={id:`v205:${state.businessFront}:${asset.id}`,kind:'v205',businessFront:state.businessFront,assetId:asset.id,activity:state.v205Activity,form:formValues(form),photos:state.pendingPhotos,salvoEm:nowIso(),user:currentUser()};await idbPut('drafts',draft);toast('Rascunho salvo neste dispositivo.')};
-    form.onsubmit=async e=>{e.preventDefault();form.querySelector('.v205-cadastral')?._v205Sync?.();validateMaskedFields(form);const valid=typeof centralValidateForm==='function'?centralValidateForm(form,{checkGroups:true}):(form.reportValidity()&&checkRequiredGroups(form));if(!valid)return;const values=formValues(form);await renderV205Review(asset,values)};
+    form.onsubmit=async e=>{e.preventDefault();form.querySelector('.v205-cadastral')?._v205Sync?.();validateMaskedFields(form);const valid=typeof centralValidateForm==='function'?centralValidateForm(form,{checkGroups:true}):(form.reportValidity()&&checkRequiredGroups(form));if(!valid)return;const values=formValues(form),reviewSections=typeof centralBuildReviewSections==='function'?centralBuildReviewSections(form,values):[];await renderV205Review(asset,values,reviewSections)};
   }
 
-  async function renderV205Review(asset,values){
-    state.screen='v205-review';const changes=safeJson(values.assetChangesJson,[])||[];const displayed=Object.entries(values).filter(([k,v])=>k!=='assetChangesJson'&&v!==''&&v!=null&&!/^shelterCheck_|^towerCheck_/.test(k));
-    main.innerHTML=`<section class="v205-page">${v205FlowSteps(3)}<div class="head-row"><div><button class="back" id="v205-review-back" type="button"><span data-icon="arrow-left"></span></button><h1>Revisar relatório</h1><p class="muted">Confira o atendimento antes de registrar.</p></div></div><div class="v205-review-grid"><section class="panel">${v205AssetSummary(asset)}<div class="v205-review-fields">${displayed.map(([k,v])=>`<div><b>${esc(prettyKey(k))}</b><span>${esc(Array.isArray(v)?v.join(', '):v)}</span></div>`).join('')}</div>${changes.length?`<div class="v205-change-review"><h3>Atualizações cadastrais propostas</h3>${changes.map(c=>`<p><b>${esc(c.label)}</b>: ${esc(c.old_value??'—')} → ${esc(c.new_value)}</p>`).join('')}<small>O cadastro mestre só será alterado após aprovação administrativa.</small></div>`:''}<div class="v205-review-photos"><b>${state.pendingPhotos.length}</b> imagem(ns) anexada(s)</div></section><aside class="panel v205-confirm"><label><input type="checkbox" id="v205-confirm"> Revisei os dados acima.</label><button class="btn primary" id="v205-confirm-report" disabled>Confirmar e registrar</button></aside></div></section>`;
+  async function renderV205Review(asset,values,reviewSections=[]){
+    state.screen='v205-review';const changes=safeJson(values.assetChangesJson,[])||[];
+    const humanReview=typeof centralReviewSectionsMarkup==='function'?centralReviewSectionsMarkup(reviewSections):'';
+    main.innerHTML=`<section class="v205-page">${v205FlowSteps(3)}<div class="head-row"><div><button class="back" id="v205-review-back" type="button"><span data-icon="arrow-left"></span></button><h1>Revisar relatório</h1><p class="muted">Confira as respostas antes de registrar.</p></div></div><div class="v205-review-grid"><section class="panel">${v205AssetSummary(asset)}${humanReview||'<div class="empty">Nenhuma resposta preenchida.</div>'}${changes.length?`<div class="v205-change-review"><h3>Atualizações cadastrais propostas</h3>${changes.map(c=>`<p><b>${esc(c.label)}</b>: ${esc(c.old_value??'—')} → ${esc(c.new_value)}</p>`).join('')}<small>O cadastro mestre só será alterado após aprovação administrativa.</small></div>`:''}<div class="v205-review-photos"><b>${state.pendingPhotos.length}</b> imagem(ns) anexada(s)</div></section><aside class="panel v205-confirm"><label><input type="checkbox" id="v205-confirm"> Revisei os dados acima.</label><button class="btn primary" id="v205-confirm-report" disabled>Confirmar e registrar</button></aside></div></section>`;
     hydrateIcons(main);document.getElementById('v205-review-back').onclick=renderV205Activity;const check=document.getElementById('v205-confirm'),btn=document.getElementById('v205-confirm-report');check.onchange=()=>btn.disabled=!check.checked;btn.onclick=()=>finalizeV205Report(asset,values,changes);
   }
 

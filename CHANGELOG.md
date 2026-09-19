@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.1.3 — 2026-09-19 — Autenticação offline e revisão padronizada
+
+- login sempre exige e-mail e senha; não há mais entrada direta por identidade ou sessão encontrada no dispositivo;
+- quando a tela de login detecta ausência de conectividade, **Entrar** é ocultado e dá lugar a **Entrar offline**;
+- o acesso offline usa um verificador local PBKDF2-SHA-256 com salt aleatório, criado somente após login online válido, sem armazenar a senha em texto;
+- mantém a autorização offline por até 7 dias e a fila local para posterior sincronização;
+- validação obrigatória passa a usar destaque discreto e remove o estado vermelho assim que o campo/grupo é corrigido;
+- revisão de relatórios de Subestação, Distribuição e Telecom passa a usar as perguntas/rótulos reais dos formulários, agrupadas por seção;
+- campos técnicos internos (IDs de participantes, JSONs e chaves auxiliares) deixam de aparecer na revisão;
+- Web, Android, cache offline e identificadores de versão sincronizados em **3.1.3**.
+
 ## v3.1.2 — 2026-09-18 — Hotfix de acesso offline e validação de formulários
 
 - corrigido o login offline em dispositivos já autorizados: o formulário não perde mais o fallback quando o bootstrap reinstala os eventos de autenticação;
